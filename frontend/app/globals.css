@@ -1,0 +1,220 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Deep space dark background */
+  --background: #050816;
+  --foreground: #f0f0ff;
+  
+  /* Card and surface colors */
+  --card: #0f1428;
+  --card-foreground: #f0f0ff;
+  
+  /* Popover */
+  --popover: #0f1428;
+  --popover-foreground: #f0f0ff;
+  
+  /* Primary - Electric blue */
+  --primary: #00d9ff;
+  --primary-foreground: #050816;
+  
+  /* Secondary - Purple glow */
+  --secondary: #7c3aed;
+  --secondary-foreground: #f0f0ff;
+  
+  /* Muted */
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  
+  /* Accent - Cyan */
+  --accent: #06b6d4;
+  --accent-foreground: #050816;
+  
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #f0f0ff;
+  
+  /* Borders and inputs */
+  --border: #1e293b;
+  --input: #0f1428;
+  --ring: #00d9ff;
+  
+  /* Chart colors - vibrant for dark background */
+  --chart-1: #00d9ff;
+  --chart-2: #7c3aed;
+  --chart-3: #06b6d4;
+  --chart-4: #a78bfa;
+  --chart-5: #38bdf8;
+  
+  /* Radius */
+  --radius: 0.625rem;
+  
+  /* Sidebar */
+  --sidebar: #0f1428;
+  --sidebar-foreground: #f0f0ff;
+  --sidebar-primary: #00d9ff;
+  --sidebar-primary-foreground: #050816;
+  --sidebar-accent: #7c3aed;
+  --sidebar-accent-foreground: #f0f0ff;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #00d9ff;
+}
+
+.dark {
+  /* Dark theme is default, maintain same values */
+  --background: #050816;
+  --foreground: #f0f0ff;
+  --card: #0f1428;
+  --card-foreground: #f0f0ff;
+  --popover: #0f1428;
+  --popover-foreground: #f0f0ff;
+  --primary: #00d9ff;
+  --primary-foreground: #050816;
+  --secondary: #7c3aed;
+  --secondary-foreground: #f0f0ff;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #06b6d4;
+  --accent-foreground: #050816;
+  --destructive: #ef4444;
+  --destructive-foreground: #f0f0ff;
+  --border: #1e293b;
+  --input: #0f1428;
+  --ring: #00d9ff;
+  --chart-1: #00d9ff;
+  --chart-2: #7c3aed;
+  --chart-3: #06b6d4;
+  --chart-4: #a78bfa;
+  --chart-5: #38bdf8;
+  --sidebar: #0f1428;
+  --sidebar-foreground: #f0f0ff;
+  --sidebar-primary: #00d9ff;
+  --sidebar-primary-foreground: #050816;
+  --sidebar-accent: #7c3aed;
+  --sidebar-accent-foreground: #f0f0ff;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #00d9ff;
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Glassmorphism and glow effects */
+@layer components {
+  .glass-panel {
+    @apply bg-background/40 backdrop-blur-xl border border-white/10;
+  }
+  
+  .glass-panel-dark {
+    @apply bg-card/50 backdrop-blur-xl border border-white/5;
+  }
+  
+  .glow-border {
+    @apply border border-primary/30 shadow-lg shadow-primary/20;
+  }
+  
+  .glow-border-accent {
+    @apply border border-accent/30 shadow-lg shadow-accent/20;
+  }
+  
+  .glow-text {
+    @apply text-primary drop-shadow-lg drop-shadow-primary/50;
+  }
+}
+
+/* Custom animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ambient-glow {
+  0% {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3), 0 0 40px rgba(124, 58, 237, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 217, 255, 0.5), 0 0 60px rgba(124, 58, 237, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3), 0 0 40px rgba(124, 58, 237, 0.2);
+  }
+}
+
+@layer utilities {
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .animate-ambient-glow {
+    animation: ambient-glow 4s ease-in-out infinite;
+  }
+}

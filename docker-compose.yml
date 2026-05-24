@@ -1,0 +1,48 @@
+services:
+
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mongodb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ai-services:
+    build: ./ai-services
+    container_name: ai-services
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-services:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mongodb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
