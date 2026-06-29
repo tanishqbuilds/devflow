@@ -65,3 +65,7 @@ Thumbs.db
 # Docker
 .docker/
 docker-compose.override.yml
+
+# Local validation artifacts
+.validation/
+dev.log

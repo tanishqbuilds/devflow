@@ -209,12 +209,98 @@
   .animate-pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
   }
-  
+
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
-  
+
   .animate-ambient-glow {
     animation: ambient-glow 4s ease-in-out infinite;
   }
+}
+
+/* ============================================================= */
+/*  Landing / marketing visual system                            */
+/* ============================================================= */
+@layer utilities {
+  /* Brand gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-400 bg-clip-text text-transparent;
+  }
+  .text-gradient-warm {
+    @apply bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-300 bg-clip-text text-transparent;
+  }
+
+  /* Subtle blueprint grid backdrop */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .bg-grid-fade {
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  /* Animated gradient border card */
+  .animate-aurora {
+    animation: aurora 18s ease-in-out infinite;
+  }
+  .animate-marquee {
+    animation: marquee 32s linear infinite;
+  }
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2.2s linear infinite;
+  }
+  .animate-gradient-pan {
+    background-size: 200% 200%;
+    animation: gradient-pan 6s ease infinite;
+  }
+  .animate-spin-slow {
+    animation: spin 14s linear infinite;
+  }
+
+  /* Hide scrollbars (used by chat + carousels) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* A frosted card with a faint gradient ring — the landing's primary surface */
+  .surface-card {
+    @apply relative rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl;
+  }
+  .surface-card-hover {
+    @apply transition-all duration-300 hover:border-primary/40 hover:bg-card/60 hover:shadow-[0_0_40px_-12px_rgba(0,217,255,0.35)];
+  }
+  /* Eyebrow pill above section headings */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium tracking-wide text-primary;
+  }
+}
+
+@keyframes aurora {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(6%, -8%) scale(1.12); }
+  66% { transform: translate(-5%, 6%) scale(0.94); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes gradient-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }

@@ -1,10 +1,22 @@
+name: planforge
+
 services:
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3100:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8010
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8010
+    depends_on:
+      - backend
 
   backend:
     build: ./backend
-    container_name: backend
     ports:
-      - "8000:8000"
+      - "8010:8000"
     volumes:
       - ./backend:/app
     env_file:
@@ -12,14 +24,20 @@ services:
     depends_on:
       - redis
       - mongodb
+      - ai-services
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   ai-services:
     build: ./ai-services
-    container_name: ai-services
     ports:
-      - "8001:8001"
+      - "8011:8001"
     volumes:
       - ./ai-services:/app
     env_file:
@@ -27,22 +45,35 @@ services:
     depends_on:
       - redis
       - mongodb
+      - ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   redis:
     image: redis:7
-    container_name: redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
 
   mongodb:
     image: mongo:7
-    container_name: mongodb
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+
+  ollama:
+    image: ollama/ollama:0.22.0
+    ports:
+      - "11434:11434"
+    volumes:
+      # Reuse the host's Ollama model cache so pulled models (e.g. qwen3) are shared.
+      - ~/.ollama:/root/.ollama
 
 volumes:
   mongo_data:

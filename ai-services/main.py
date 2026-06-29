@@ -1,30 +1,46 @@
 import os
 import time
+from contextlib import asynccontextmanager
+
+import httpx
+import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, status
-from pydantic import BaseModel
-import redis.asyncio as aioredis
-from motor.motor_asyncio import AsyncIOMotorClient
-
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel
+
+from api.routes import router as api_router
+from services.redis_client import close_redis
+from utils.logging import get_logger
+
+logger = get_logger("main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("ai-services starting (provider=%s, model=%s)",
+                os.getenv("LLM_PROVIDER", "ollama"), os.getenv("LLM_MODEL", "qwen3"))
+    yield
+    await close_redis()
+    logger.info("ai-services shut down")
+
 
 app = FastAPI(
-    title="Devflow AI Services API",
-    description="AI Orchestration and Agent Services for Devflow",
+    title="PlanForge AI Services API",
+    description="AI orchestration and agent services for PlanForge",
     version="1.0.0",
-    docs_url=None,  # Disable default docs
+    docs_url=None,
+    lifespan=lifespan,
 )
 
-from fastapi.responses import HTMLResponse
+app.include_router(api_router)
+
 
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
-    response = get_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title=app.title + " - Swagger UI",
-    )
-    # Applying a post-processing CSS filter to invert colors for a perfect dark mode
-    # This guarantees the layout remains 100% default and unbroken
+    response = get_swagger_ui_html(openapi_url=app.openapi_url, title=app.title + " - Swagger UI")
     dark_css = """
     <style>
         html { filter: invert(90%) hue-rotate(180deg); background-color: white; }
@@ -36,11 +52,11 @@ async def custom_swagger_ui_html():
     return HTMLResponse(content=html_content, status_code=response.status_code)
 
 
-
-# Configuration from env with fallback defaults
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
 APP_VERSION = "1.0.0"
+START_TIME = time.time()
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -48,72 +64,65 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
     dependencies: dict
 
-# Track startup time for uptime calculation
-START_TIME = time.time()
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {
-        "redis": "unknown",
-        "mongodb": "unknown",
-        "llm": "unknown"
-    }
-    
-    # Check Redis
+    dependencies = {"redis": "unknown", "mongodb": "unknown", "llm": "unknown"}
+
     try:
         r = aioredis.from_url(REDIS_URL, socket_timeout=2.0)
         await r.ping()
-        await r.close()
+        await r.aclose()
         dependencies["redis"] = "healthy"
     except Exception as e:
         dependencies["redis"] = f"unhealthy: {str(e)}"
-        
-    # Check MongoDB
+
     try:
         client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=2000)
-        await client.admin.command('ismaster')
+        await client.admin.command("ismaster")
         dependencies["mongodb"] = "healthy"
     except Exception as e:
         dependencies["mongodb"] = f"unhealthy: {str(e)}"
-        
-    # Check LLM (Ollama or Cloud OpenAI)
+
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-    LLM_MODEL = os.getenv("LLM_MODEL", "mistral")
-    
+    LLM_MODEL = os.getenv("LLM_MODEL", "qwen3")
+
     if LLM_PROVIDER.lower() == "ollama":
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=2.0) as client:
+            async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags")
                 if resp.status_code == 200:
-                    models_data = resp.json().get("models", [])
-                    available_models = [m.get("name", "") for m in models_data]
-                    if any(LLM_MODEL in name for name in available_models):
+                    available = [m.get("name", "") for m in resp.json().get("models", [])]
+                    if any(LLM_MODEL in name for name in available):
                         dependencies["llm"] = f"healthy (Ollama - {LLM_MODEL} loaded)"
                     else:
-                        dependencies["llm"] = f"degraded (Ollama active but {LLM_MODEL} model not pulled. Available: {available_models})"
+                        dependencies["llm"] = (
+                            f"degraded (Ollama up but '{LLM_MODEL}' not pulled. Available: {available})"
+                        )
                 else:
                     dependencies["llm"] = f"unhealthy: Ollama status {resp.status_code}"
         except Exception as e:
-            dependencies["llm"] = f"unhealthy: Cannot reach Ollama at {OLLAMA_BASE_URL} ({str(e)})"
+            dependencies["llm"] = f"unhealthy: cannot reach Ollama at {OLLAMA_BASE_URL} ({str(e)})"
+    elif LLM_PROVIDER.lower() == "groq":
+        has_key = bool(os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API"))
+        dependencies["llm"] = (
+            f"healthy (Groq Cloud - {LLM_MODEL})" if has_key
+            else "unhealthy: GROQ_API_KEY / GROQ_API not set"
+        )
     else:
-        dependencies["llm"] = "healthy (configured for cloud OpenAI API)"
-        
-    overall_status = "healthy"
-    if any("unhealthy" in v for v in dependencies.values()):
-        overall_status = "degraded"
-        
+        dependencies["llm"] = "healthy (configured for OpenAI-compatible cloud API)"
+
+    overall = "degraded" if any("unhealthy" in v for v in dependencies.values()) else "healthy"
     return HealthResponse(
-        status=overall_status,
-        version=APP_VERSION,
-        uptime_seconds=time.time() - START_TIME,
-        dependencies=dependencies
+        status=overall, version=APP_VERSION, uptime_seconds=time.time() - START_TIME, dependencies=dependencies
     )
+
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Devflow AI Services API. Access /docs for API documentation."}
+    return {"message": "PlanForge AI Services. See /docs for API documentation."}
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)

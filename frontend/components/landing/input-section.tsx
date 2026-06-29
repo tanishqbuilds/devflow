@@ -3,112 +3,146 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { ArrowRight, Loader2, Wand2 } from 'lucide-react'
+import { analyzeProject } from '@/lib/api'
+import { Reveal } from './reveal'
 
-const examplePrompts = [
-  'Build a real-time collaboration SaaS platform',
-  'Create an AI-powered customer support chatbot',
-  'Develop a mobile fitness tracking app',
-  'Launch a decentralized finance protocol',
-  'Design a team project management tool',
+const EXAMPLES = [
+  'AI-powered recruitment platform that screens candidates for startups',
+  'Real-time collaborative whiteboard for remote design teams',
+  'Subscription analytics dashboard for SaaS founders',
+  'Marketplace connecting local farmers with restaurants',
 ]
 
 export function InputSection() {
   const [input, setInput] = useState('')
-  const [currentExampleIndex, setCurrentExampleIndex] = useState(0)
-  const [displayedText, setDisplayedText] = useState('')
+  const [placeholder, setPlaceholder] = useState('')
+  const [exampleIdx, setExampleIdx] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Rotating example text animation
+  // Rotating typewriter placeholder
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentExampleIndex((prev) => (prev + 1) % examplePrompts.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Typewriter animation for example text
-  useEffect(() => {
-    const prompt = examplePrompts[currentExampleIndex]
+    if (input) return
+    const phrase = EXAMPLES[exampleIdx]
     let i = 0
-    setDisplayedText('')
-
-    const typeInterval = setInterval(() => {
-      if (i < prompt.length) {
-        setDisplayedText((prev) => prev + prompt[i])
+    setPlaceholder('')
+    const type = setInterval(() => {
+      if (i < phrase.length) {
+        setPlaceholder((p) => p + phrase[i])
         i++
       } else {
-        clearInterval(typeInterval)
+        clearInterval(type)
       }
-    }, 30)
+    }, 28)
+    const next = setTimeout(() => setExampleIdx((e) => (e + 1) % EXAMPLES.length), 5200)
+    return () => {
+      clearInterval(type)
+      clearTimeout(next)
+    }
+  }, [exampleIdx, input])
 
-    return () => clearInterval(typeInterval)
-  }, [currentExampleIndex])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (input.trim()) {
-      // Store the project idea and navigate to workspace
-      router.push(`/workspace?idea=${encodeURIComponent(input)}`)
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const idea = input.trim()
+    if (idea.length < 8 || submitting) {
+      if (idea.length < 8) setError('Add a little more detail (at least 8 characters).')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { project_id } = await analyzeProject(idea)
+      router.push(`/workspace?project=${project_id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start. Is the backend running?')
+      setSubmitting(false)
     }
   }
 
   return (
-    <motion.div
-      className="w-full max-w-2xl mx-auto px-4 py-16"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.6 }}
-    >
-      <form onSubmit={handleSubmit} className="relative group">
-        {/* Animated glow background */}
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-cyan-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 3, repeat: Infinity }}
-        />
+    <section id="plan" className="relative px-4 py-16 sm:py-20 scroll-mt-24">
+      <div className="max-w-3xl mx-auto">
+        <Reveal className="text-center">
+          <span className="eyebrow"><Wand2 className="w-3.5 h-3.5" /> Try it now — free</span>
+          <h2 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight">
+            Type an idea. Watch a plan <span className="text-gradient">build itself.</span>
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            One sentence or a messy brief — both work. The AI org takes it from there.
+          </p>
+        </Reveal>
 
-        <div className="relative">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={`e.g., ${displayedText}`}
-            className="w-full px-6 py-4 bg-card/50 backdrop-blur-xl border border-white/10 rounded-2xl text-foreground placeholder-muted-foreground/60 resize-none focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-300 min-h-24 text-lg"
-          />
+        <Reveal delay={0.1} className="mt-8">
+          <form onSubmit={handleSubmit} className="relative group">
+            <motion.div
+              className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-cyan-500/40 via-violet-500/40 to-cyan-500/40 opacity-40 blur-lg group-focus-within:opacity-80 transition-opacity"
+              animate={{ opacity: [0.25, 0.5, 0.25] }}
+              transition={{ duration: 4, repeat: Infinity }}
+            />
+            <div className="relative rounded-2xl border border-white/12 bg-card/70 backdrop-blur-xl p-2">
+              <textarea
+                id="idea-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
+                }}
+                placeholder={input ? '' : placeholder || 'Describe what you want to build…'}
+                rows={3}
+                className="w-full resize-none bg-transparent px-4 pt-3 pb-12 text-base sm:text-lg text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+              />
+              <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground/70 hidden sm:block">
+                  Press <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">⌘</kbd>
+                  <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">↵</kbd> to plan
+                </span>
+                <motion.button
+                  type="submit"
+                  disabled={submitting}
+                  className="ml-auto inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60 hover:shadow-[0_0_24px_-4px_var(--primary)] transition-shadow"
+                  whileHover={{ scale: submitting ? 1 : 1.04 }}
+                  whileTap={{ scale: submitting ? 1 : 0.97 }}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Assembling the org…
+                    </>
+                  ) : (
+                    <>
+                      Plan my project <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </div>
+          </form>
+          {error && (
+            <p className="mt-3 text-sm text-red-400 text-center" role="alert">
+              {error}
+            </p>
+          )}
+        </Reveal>
 
-          <motion.button
-            type="submit"
-            disabled={!input.trim()}
-            className="absolute bottom-4 right-4 px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-black font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 disabled:hover:shadow-none"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Plan
-          </motion.button>
-        </div>
-      </form>
-
-      {/* Example prompts display */}
-      <motion.div
-        className="mt-8 text-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8, delay: 0.8 }}
-      >
-        <p className="text-sm text-muted-foreground mb-4">Try these examples:</p>
-        <div className="flex flex-wrap gap-2 justify-center">
-          {examplePrompts.slice(0, 3).map((prompt, idx) => (
-            <motion.button
-              key={idx}
-              onClick={() => setInput(prompt)}
-              className="px-3 py-1 text-xs bg-card/50 border border-white/10 rounded-full text-muted-foreground hover:text-primary hover:border-primary/50 transition-all duration-300"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {prompt.substring(0, 30)}...
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
-    </motion.div>
+        <Reveal delay={0.2} className="mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="text-xs text-muted-foreground">Try:</span>
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                onClick={() => {
+                  setInput(ex)
+                  setError(null)
+                }}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+              >
+                {ex.length > 38 ? ex.slice(0, 38) + '…' : ex}
+              </button>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+    </section>
   )
 }

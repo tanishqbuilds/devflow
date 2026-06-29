@@ -7,9 +7,32 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'FreshFlow - AI Project Planning',
-  description: 'Turn ideas into executable plans with AI-powered project intelligence',
-  generator: 'v0.app',
+  metadataBase: new URL('https://planforge.ai'),
+  title: {
+    default: 'PlanForge — Ship the plan before you write the first line of code',
+    template: '%s · PlanForge',
+  },
+  description:
+    'PlanForge is an AI organization — PM, architect, estimation and risk agents — that turns one idea into a complete software delivery plan: requirements, backlog, milestones, team, cost and risks. Free to start.',
+  keywords: [
+    'AI project planning', 'SDLC automation', 'AI product manager', 'software delivery plan',
+    'AI sprint planning', 'project estimation', 'requirements generator', 'PlanForge',
+  ],
+  authors: [{ name: 'PlanForge' }],
+  openGraph: {
+    title: 'PlanForge — Turn one idea into a complete software plan',
+    description:
+      'An AI organization that drafts your requirements, backlog, milestones, team, cost and risks in minutes. Free to start, no credit card.',
+    url: 'https://planforge.ai',
+    siteName: 'PlanForge',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PlanForge — Ship the plan before you write code',
+    description: 'An AI org that turns one idea into a full delivery plan in minutes.',
+  },
+  generator: 'PlanForge',
   icons: {
     icon: [
       {

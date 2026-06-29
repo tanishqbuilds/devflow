@@ -1,201 +1,112 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { CheckCircle, Circle, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Flag, Rocket, Beaker, Boxes, TrendingUp } from 'lucide-react'
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useProjectStore } from '@/lib/project-store'
+import { GeneratingPanel } from './overview-view'
+import type { MilestoneItem } from '@/lib/project-types'
 
-const milestones = [
-  {
-    id: 1,
-    title: 'Project Kickoff',
-    description: 'Team alignment and planning',
-    date: '2024-01-15',
-    status: 'complete',
-    completion: 100,
-  },
-  {
-    id: 2,
-    title: 'Requirements Review',
-    description: 'Stakeholder approval on specs',
-    date: '2024-02-01',
-    status: 'complete',
-    completion: 100,
-  },
-  {
-    id: 3,
-    title: 'Design Phase',
-    description: 'Architecture and UI/UX design',
-    date: '2024-02-20',
-    status: 'active',
-    completion: 75,
-  },
-  {
-    id: 4,
-    title: 'Development Sprint 1',
-    description: 'Core feature implementation',
-    date: '2024-03-15',
-    status: 'pending',
-    completion: 0,
-  },
-  {
-    id: 5,
-    title: 'Quality Assurance',
-    description: 'Testing and bug fixes',
-    date: '2024-04-20',
-    status: 'pending',
-    completion: 0,
-  },
-  {
-    id: 6,
-    title: 'Launch',
-    description: 'Production deployment',
-    date: '2024-05-15',
-    status: 'pending',
-    completion: 0,
-  },
-]
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'complete':
-      return 'text-green-400'
-    case 'active':
-      return 'text-primary'
-    case 'pending':
-      return 'text-muted-foreground'
-    default:
-      return 'text-muted-foreground'
-  }
+const phaseMeta: Record<string, { label: string; color: string; icon: any }> = {
+  mvp: { label: 'MVP', color: 'text-cyan-400', icon: Rocket },
+  beta: { label: 'Beta', color: 'text-purple-400', icon: Beaker },
+  production: { label: 'Production', color: 'text-emerald-400', icon: Boxes },
+  scaling: { label: 'Scaling', color: 'text-amber-400', icon: TrendingUp },
 }
 
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'complete':
-      return <CheckCircle className="w-5 h-5 text-green-400" />
-    case 'active':
-      return <AlertCircle className="w-5 h-5 text-primary animate-pulse-glow" />
-    case 'pending':
-      return <Circle className="w-5 h-5 text-muted-foreground" />
-    default:
-      return <Circle className="w-5 h-5 text-muted-foreground" />
-  }
+function addWeeks(iso: string | undefined, weeks: number): string {
+  const base = iso ? new Date(iso) : new Date()
+  const d = new Date(base.getTime() + weeks * 7 * 24 * 60 * 60 * 1000)
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function MilestonesView() {
-  return (
-    <motion.div
-      className="space-y-6"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.6 }}
-    >
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Project Milestones</h2>
-        <p className="text-muted-foreground mt-1">Timeline and key deliverables tracking</p>
-      </div>
+  const project = useProjectStore((s) => s.project)
+  const timeline = project?.timeline || null
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <motion.div
-          className="glass-panel p-4 rounded-lg"
-          whileHover={{ scale: 1.02 }}
-        >
-          <p className="text-sm text-muted-foreground">Total Milestones</p>
-          <p className="text-2xl font-bold text-primary mt-2">6</p>
-          <p className="text-xs text-muted-foreground mt-1">Tracked</p>
-        </motion.div>
-
-        <motion.div
-          className="glass-panel p-4 rounded-lg"
-          whileHover={{ scale: 1.02 }}
-        >
-          <p className="text-sm text-muted-foreground">Completed</p>
-          <p className="text-2xl font-bold text-green-400 mt-2">2</p>
-          <p className="text-xs text-muted-foreground mt-1">On schedule</p>
-        </motion.div>
-
-        <motion.div
-          className="glass-panel p-4 rounded-lg"
-          whileHover={{ scale: 1.02 }}
-        >
-          <p className="text-sm text-muted-foreground">Overall Progress</p>
-          <p className="text-2xl font-bold text-accent mt-2">33%</p>
-          <p className="text-xs text-muted-foreground mt-1">Of project</p>
-        </motion.div>
-      </div>
-
-      {/* Timeline */}
-      <div className="space-y-4">
-        {milestones.map((milestone, index) => (
-          <motion.div
-            key={milestone.id}
-            className="glass-panel p-4 rounded-lg border-l-4 border-primary/30"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.01, borderLeftColor: '#00d9ff' }}
-          >
-            <div className="flex gap-4">
-              <div className="flex flex-col items-center gap-2 min-w-[50px]">
-                {getStatusIcon(milestone.status)}
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="font-semibold text-foreground">{milestone.title}</h3>
-                  <span className={`text-xs font-medium whitespace-nowrap ${getStatusColor(milestone.status)}`}>
-                    {milestone.status === 'complete' ? 'Complete' : 
-                     milestone.status === 'active' ? 'In Progress' : 'Pending'}
-                  </span>
-                </div>
-                
-                <p className="text-sm text-muted-foreground mt-1">{milestone.description}</p>
-                
-                {milestone.status !== 'complete' && milestone.status !== 'pending' && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">Progress</span>
-                      <span className="text-xs font-medium text-primary">{milestone.completion}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${milestone.completion}%` }}
-                        transition={{ duration: 1, delay: 0.3 }}
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                <p className="text-xs text-muted-foreground mt-2">
-                  Due: {new Date(milestone.date).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Key Dates */}
-      <motion.div
-        className="glass-panel p-6 rounded-lg"
-        whileHover={{ scale: 1.01 }}
-      >
-        <CardHeader className="px-0 pt-0">
-          <CardTitle className="text-lg">Critical Path</CardTitle>
-          <CardDescription>Longest sequence of dependent activities</CardDescription>
-        </CardHeader>
-        <CardContent className="px-0 space-y-2">
-          <div className="text-sm text-foreground">
-            Design Phase (Feb 20) → Dev Sprint 1 (Mar 15) → QA (Apr 20) → Launch (May 15)
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Total duration: 90 days | Slack: 0 days
-          </div>
-        </CardContent>
+  if (!timeline) {
+    return (
+      <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <h2 className="text-2xl font-bold text-foreground">Milestones & Roadmap</h2>
+        <GeneratingPanel label="Delivery timeline" />
       </motion.div>
+    )
+  }
+
+  const milestones: MilestoneItem[] = [...(timeline.milestones || [])].sort((a, b) => a.start_week - b.start_week)
+  const created = project?.created_at
+
+  return (
+    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">Milestones & Roadmap</h2>
+        <p className="text-muted-foreground mt-1">Delivery schedule across MVP → Beta → Production → Scaling</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Stat label="Total Milestones" value={String(milestones.length)} sub="Planned" valueClass="text-primary" />
+        <Stat label="Total Duration" value={`${timeline.total_duration_weeks} wks`} sub="End to end" valueClass="text-accent" />
+        <Stat label="Phases" value={String(new Set(milestones.map((m) => m.phase)).size)} sub="Distinct" valueClass="text-cyan-400" />
+      </div>
+
+      <div className="space-y-4">
+        {milestones.map((m, index) => {
+          const meta = phaseMeta[m.phase] || phaseMeta.mvp
+          const Icon = meta.icon
+          return (
+            <motion.div key={index} className="glass-panel p-5 rounded-lg border-l-4 border-primary/30"
+              initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.06 }} whileHover={{ scale: 1.01 }}>
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center gap-2 min-w-[44px] pt-1">
+                  <Icon className={`w-5 h-5 ${meta.color}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                    <h3 className="font-semibold text-foreground">{m.title}</h3>
+                    <span className={`text-xs font-medium ${meta.color}`}>{meta.label}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {addWeeks(created, m.start_week)} → {addWeeks(created, m.start_week + m.duration_weeks)} · {m.duration_weeks} weeks
+                  </p>
+                  {m.deliverables?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {m.deliverables.map((d, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[11px] text-foreground/80">{d}</span>
+                      ))}
+                    </div>
+                  )}
+                  {m.dependencies?.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground mt-2">Depends on: {m.dependencies.join(', ')}</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {timeline.critical_path?.length > 0 && (
+        <motion.div className="glass-panel p-6 rounded-lg" whileHover={{ scale: 1.01 }}>
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-lg flex items-center gap-2"><Flag className="w-4 h-4 text-primary" /> Critical Path</CardTitle>
+            <CardDescription>Longest sequence of dependent milestones</CardDescription>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="text-sm text-foreground">{timeline.critical_path.join('  →  ')}</div>
+          </CardContent>
+        </motion.div>
+      )}
+    </motion.div>
+  )
+}
+
+function Stat({ label, value, sub, valueClass }: { label: string; value: string; sub: string; valueClass: string }) {
+  return (
+    <motion.div className="glass-panel p-4 rounded-lg" whileHover={{ scale: 1.02 }}>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold mt-2 ${valueClass}`}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
     </motion.div>
   )
 }
