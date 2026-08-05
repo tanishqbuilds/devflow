@@ -44,7 +44,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.16 }}
         >
-          PlanForge is an AI organization — PM, architect, estimation and risk agents — that turns
+          Devflow is an AI organization — PM, architect, estimation and risk agents — that turns
           one idea into a complete delivery plan: requirements, backlog, milestones, team, cost and risks.
         </motion.p>
 

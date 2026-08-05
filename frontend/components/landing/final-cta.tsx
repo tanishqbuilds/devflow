@@ -64,7 +64,7 @@ export function FinalCta() {
               </h2>
 
               <p className="mx-auto mt-5 max-w-xl text-balance text-muted-foreground sm:text-lg">
-                Give PlanForge one sentence. Get a plan your whole team can build
+                Give Devflow one sentence. Get a plan your whole team can build
                 from — today.
               </p>
 

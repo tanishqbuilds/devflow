@@ -1,4 +1,4 @@
-"""Structured output schemas for every PlanForge agent.
+"""Structured output schemas for every Devflow agent.
 
 Each agent is given a JSON schema (derived from these Pydantic models) and is
 required to return data matching it. The LLM-facing schemas intentionally avoid

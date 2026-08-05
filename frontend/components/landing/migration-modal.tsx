@@ -71,7 +71,7 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold">Bring your existing project into PlanForge</h3>
+            <h3 className="text-xl font-bold">Bring your existing project into Devflow</h3>
             <p className="mt-1.5 text-sm text-muted-foreground">
               We reconstruct your full plan — milestones, backlog, risks and cost — from what you already have.
             </p>

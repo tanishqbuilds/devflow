@@ -21,7 +21,7 @@ START_TIME = time.time()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("PlanForge backend starting")
+    logger.info("Devflow backend starting")
     await init_indexes()
     start_workers()
     logger.info("Orchestrator workers started (%d)", settings.worker_count)
@@ -29,12 +29,12 @@ async def lifespan(app: FastAPI):
     await stop_workers()
     await close_redis()
     await close_mongo()
-    logger.info("PlanForge backend shut down")
+    logger.info("Devflow backend shut down")
 
 
 app = FastAPI(
-    title="PlanForge Backend API",
-    description="Orchestration layer for the PlanForge AI SDLC platform",
+    title="Devflow Backend API",
+    description="Orchestration layer for the Devflow AI SDLC platform",
     version=settings.app_version,
     docs_url=None,
     lifespan=lifespan,
@@ -97,4 +97,4 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    return {"message": "PlanForge Backend API. See /docs for API documentation."}
+    return {"message": "Devflow Backend API. See /docs for API documentation."}

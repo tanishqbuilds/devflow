@@ -1,6 +1,6 @@
-# PlanForge AI 🛰️
+# Devflow AI 🛰️
 
-**An AI-native SDLC automation platform.** PlanForge turns a single raw idea into a
+**An AI-native SDLC automation platform.** Devflow turns a single raw idea into a
 complete, execution-ready software delivery plan. Behind the scenes an autonomous
 *AI organization* — CEO, Product Manager, System Architect, Sprint Planner, Risk
 Analyst, Team/Delivery and Integration agents — works in parallel to produce an
@@ -47,9 +47,9 @@ a live, streaming orchestration graph rather than a chat box.
                  │ • model router         │   │ buffer    │
                  └───────┬───────────────┘   └──────────┘
                          │ OpenAI-compatible API
-                 ┌───────▼───────────────┐
-                 │ Ollama (local LLM)     │  :11434
-                 └────────────────────────┘
+                  ┌───────▼───────────────┐
+                  │ Groq Cloud API        │  (or OpenAI-compatible API)
+                  └────────────────────────┘
 ```
 
 **Separation of concerns (as specified):**
@@ -97,13 +97,12 @@ structured output** (`ai-services/agents/schemas.py`), the **model router**
 ### Prerequisites
 - Docker + Docker Compose
 - Node.js 20+ (only if running the frontend locally for dev)
-- [Ollama](https://ollama.com) model cache — the compose Ollama service mounts `~/.ollama`,
-  so any model you have pulled is reused.
+- Groq API Key (or OpenAI key) in `.env`
 
 ### 1. Bring up the backend stack
 
 ```bash
-make up-backend     # backend, ai-services, redis, mongodb, ollama
+make up-backend     # backend, ai-services, redis, mongodb
 # or the full stack incl. the dockerized frontend:
 make build-dev      # docker compose up --build
 ```
@@ -148,9 +147,8 @@ platform for startups."*), and watch the AI organization work.
 | AI Services + Swagger | http://localhost:8011/docs |
 | MongoDB | mongodb://localhost:27017 |
 | Redis | redis://localhost:6380 |
-| Ollama | http://localhost:11434 |
 
-> Ports are intentionally offset (3100/8010/8011/6380) so PlanForge runs alongside other
+> Ports are intentionally offset (3100/8010/8011/6380) so Devflow runs alongside other
 > local stacks without colliding on 3000/8000/6379.
 
 ---
@@ -173,7 +171,7 @@ Health checks: `GET /health` on both `:8010` and `:8011` (reports redis / mongod
 
 ## 🗄️ Persistence
 
-- **MongoDB** (`planforge.projects`): the canonical project documents + orchestration state.
+- **MongoDB** (`devflow.projects`): the canonical project documents + orchestration state.
 - **Redis**: the analysis job queue (`queue:analyze`), the per-project pub/sub event
   channel (`events:{id}`), and a durable event buffer (`events:{id}:buffer`) for WS replay.
 - **Auth**: Clerk when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set, with a working mock-user
@@ -187,9 +185,8 @@ Health checks: `GET /health` on both `:8010` and `:8011` (reports redis / mongod
 | --- | --- |
 | `make dev` | `docker compose up` |
 | `make build-dev` | build + up (full stack) |
-| `make up-backend` | up only backend/ai/redis/mongo/ollama |
+| `make up-backend` | up only backend/ai/redis/mongo |
 | `make frontend-dev` | run Next.js locally on :3100 |
-| `make models` | pull `$(LLM_MODEL)` into Ollama |
 | `make health` | curl both `/health` endpoints |
 | `make logs` / `down` / `prune` | logs / teardown / cleanup |
 | `make backend` / `ai` / `mongo` / `redis` | open a shell/CLI in a container |

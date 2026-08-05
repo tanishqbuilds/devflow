@@ -1,4 +1,4 @@
-"""The agent registry — the single source of truth for PlanForge's AI org.
+"""The agent registry — the single source of truth for Devflow's AI org.
 
 Each entry binds an agent id to its human role, the orchestration-graph node it
 drives, its output schema, and its dedicated prompt module.

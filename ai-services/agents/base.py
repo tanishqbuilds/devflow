@@ -1,6 +1,6 @@
 """Base agent abstraction.
 
-Every PlanForge agent shares the same execution shape: take the accumulated
+Every Devflow agent shares the same execution shape: take the accumulated
 project context, render a dedicated prompt, call the LLM for structured output,
 and return a validated dict. The differences (role, prompt, schema, model) are
 pure configuration, so a single ``Agent`` class is parameterized by metadata.

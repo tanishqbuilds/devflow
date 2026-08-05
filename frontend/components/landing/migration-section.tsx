@@ -27,10 +27,10 @@ export function MigrationSection() {
           <Reveal className="max-w-2xl">
             <span className="eyebrow"><RefreshCw className="w-3.5 h-3.5" /> Already mid-project?</span>
             <h2 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-balance">
-              Bring your existing project into PlanForge in <span className="text-gradient-warm">2 minutes.</span>
+              Bring your existing project into Devflow in <span className="text-gradient-warm">2 minutes.</span>
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              Paste a spec, drop a Jira/Linear CSV, or connect your repo. PlanForge reconstructs your full
+              Paste a spec, drop a Jira/Linear CSV, or connect your repo. Devflow reconstructs your full
               plan and shows it side-by-side with what you already have. Nothing gets lost, nothing gets locked in.
             </p>
           </Reveal>

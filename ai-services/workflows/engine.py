@@ -1,4 +1,4 @@
-"""The PlanForge workflow engine.
+"""The Devflow workflow engine.
 
 Implements the orchestration graph:
 

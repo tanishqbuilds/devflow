@@ -61,7 +61,7 @@ export function ProblemSection() {
 
         <Reveal direction="up" delay={0.1} className="mt-14">
           <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-            PlanForge does the planning the way a senior team would —{' '}
+            Devflow does the planning the way a senior team would —{' '}
             <span className="text-gradient">in minutes.</span>
           </p>
         </Reveal>

@@ -24,7 +24,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How is it free?',
-    a: 'PlanForge runs on fast, efficient open models (Groq), so the free tier is genuinely free — no trial trap.',
+    a: 'Devflow runs on fast, efficient open models (Groq), so the free tier is genuinely free — no trial trap.',
   },
   {
     q: "What if I'm already mid-project?",

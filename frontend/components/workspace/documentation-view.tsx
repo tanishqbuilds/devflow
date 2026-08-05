@@ -285,8 +285,8 @@ export function DocumentationView() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const safe = (docTitle || 'planforge-project').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()
-      a.download = `${safe || 'planforge-project'}.json`
+      const safe = (docTitle || 'devflow-project').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()
+      a.download = `${safe || 'devflow-project'}.json`
       document.body.appendChild(a)
       a.click()
       a.remove()

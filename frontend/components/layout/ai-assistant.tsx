@@ -69,7 +69,7 @@ export function AiAssistant() {
         {
           role: 'assistant',
           content:
-            "Hi — I'm your PlanForge copilot. I can read this project's full plan: requirements, backlog, risks, team, cost and timeline. Ask me anything, or tap a suggestion below.",
+            "Hi — I'm your Devflow copilot. I can read this project's full plan: requirements, backlog, risks, team, cost and timeline. Ask me anything, or tap a suggestion below.",
         },
       ])
     }
@@ -142,7 +142,7 @@ export function AiAssistant() {
                   <Bot className="w-4.5 h-4.5 text-primary" />
                 </span>
                 <div>
-                  <div className="text-sm font-semibold text-foreground leading-none">PlanForge Copilot</div>
+                  <div className="text-sm font-semibold text-foreground leading-none">Devflow Copilot</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">
                     {ready ? 'Grounded in this project' : 'Waiting for the plan…'}
                   </div>

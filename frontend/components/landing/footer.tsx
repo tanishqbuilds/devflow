@@ -126,7 +126,7 @@ export function LandingFooter() {
         <Reveal delay={0.1}>
           <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row">
             <p className="text-xs text-muted-foreground">
-              © 2026 PlanForge. All rights reserved.
+              © 2026 Devflow. All rights reserved.
             </p>
             <p className="text-xs text-muted-foreground/70">
               Built with an AI organization.

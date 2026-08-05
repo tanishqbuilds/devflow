@@ -14,7 +14,7 @@ class Settings:
     app_version: str = "1.0.0"
     redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     mongo_url: str = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
-    mongo_db: str = os.getenv("MONGO_DB", "planforge")
+    mongo_db: str = os.getenv("MONGO_DB", "devflow")
     ai_services_url: str = os.getenv("AI_SERVICES_URL", "http://ai-services:8001")
 
     # Orchestration

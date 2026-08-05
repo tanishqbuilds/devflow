@@ -39,7 +39,7 @@ export function HeroPreview() {
           <span className="w-3 h-3 rounded-full bg-yellow-400/70" />
           <span className="w-3 h-3 rounded-full bg-green-400/70" />
           <div className="ml-3 flex-1 max-w-sm rounded-md bg-white/5 border border-white/10 px-3 py-1 text-[11px] text-muted-foreground">
-            planforge.ai / workspace
+            devflow.ai / workspace
           </div>
         </div>
 

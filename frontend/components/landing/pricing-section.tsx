@@ -92,7 +92,7 @@ export function PricingSection() {
             Start free. <span className="text-gradient">Upgrade when it pays for itself.</span>
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            One blown sprint costs more than a year of PlanForge. Pricing scales with plans, not friction.
+            One blown sprint costs more than a year of Devflow. Pricing scales with plans, not friction.
           </p>
 
           {/* toggle */}

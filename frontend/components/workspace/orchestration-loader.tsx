@@ -160,7 +160,7 @@ export function OrchestrationLoader() {
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-wider uppercase text-foreground">
-              PlanForge Autonomous Planning Engine
+              Devflow Autonomous Planning Engine
             </h1>
             <p className="text-[10px] text-muted-foreground font-mono">
               VER_1.0 // {completed ? 'ORCHESTRATION_COMPLETE' : failed ? 'DEGRADED' : 'ACTIVE_ORCHESTRATION'}

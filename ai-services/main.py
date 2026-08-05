@@ -21,15 +21,15 @@ logger = get_logger("main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("ai-services starting (provider=%s, model=%s)",
-                os.getenv("LLM_PROVIDER", "ollama"), os.getenv("LLM_MODEL", "qwen3"))
+                os.getenv("LLM_PROVIDER", "groq"), os.getenv("LLM_MODEL", "llama-3.3-70b-versatile"))
     yield
     await close_redis()
     logger.info("ai-services shut down")
 
 
 app = FastAPI(
-    title="PlanForge AI Services API",
-    description="AI orchestration and agent services for PlanForge",
+    title="Devflow AI Services API",
+    description="AI orchestration and agent services for Devflow",
     version="1.0.0",
     docs_url=None,
     lifespan=lifespan,
@@ -84,9 +84,9 @@ async def health_check():
     except Exception as e:
         dependencies["mongodb"] = f"unhealthy: {str(e)}"
 
-    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-    LLM_MODEL = os.getenv("LLM_MODEL", "qwen3")
+    LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 
     if LLM_PROVIDER.lower() == "ollama":
         try:
@@ -121,7 +121,7 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    return {"message": "PlanForge AI Services. See /docs for API documentation."}
+    return {"message": "Devflow AI Services. See /docs for API documentation."}
 
 
 if __name__ == "__main__":

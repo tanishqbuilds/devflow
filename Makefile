@@ -1,11 +1,11 @@
-LLM_MODEL ?= qwen3
-
 # ---- Core (spec-required) ----
 dev:
-	docker compose up
+	docker compose up --build --detach --wait
+	@echo "Devflow is ready at http://localhost:3100"
 
 build-dev:
-	docker compose up --build
+	docker compose up --build --detach --wait
+	@echo "Devflow is ready at http://localhost:3100"
 
 down:
 	docker compose down
@@ -18,16 +18,13 @@ logs:
 
 # ---- Convenience ----
 up-backend:        ## Bring up only the API stack (no dockerized frontend build)
-	docker compose up -d backend ai-services redis mongodb ollama
+	docker compose up -d backend ai-services redis mongodb
 
 restart:
 	docker compose restart
 
 ps:
 	docker compose ps
-
-models:            ## Pull the configured LLM into the Ollama container
-	docker compose exec ollama ollama pull $(LLM_MODEL)
 
 health:
 	@curl -s http://localhost:8010/health | python3 -m json.tool || true
