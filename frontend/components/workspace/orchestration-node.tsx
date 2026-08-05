@@ -1,6 +1,6 @@
 'use client'
 
-import { Handle, Position } from '@xyflow/react'
+import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
 import {
@@ -14,17 +14,12 @@ import {
   PlayCircle,
 } from 'lucide-react'
 
-interface OrchestrationNodeProps {
-  data: {
-    label: string
-    iconType: 'lightbulb' | 'check-circle' | 'zap' | 'list-todo' | 'rocket' | 'alert-triangle' | 'dollar-sign' | 'play-circle'
-    status: 'idle' | 'thinking' | 'analyzing' | 'generating' | 'complete'
-    progress: number
-  }
-  isConnecting: boolean
-  selected: boolean
-  id: string
-}
+export type OrchestrationFlowNode = Node<{
+  label: string
+  iconType: 'lightbulb' | 'check-circle' | 'zap' | 'list-todo' | 'rocket' | 'alert-triangle' | 'dollar-sign' | 'play-circle'
+  status: 'idle' | 'thinking' | 'analyzing' | 'generating' | 'complete'
+  progress: number
+}, 'orchestrationNode'>
 
 const iconMap = {
   'lightbulb': <Lightbulb className="w-6 h-6 text-yellow-400" />,
@@ -53,7 +48,7 @@ const statusLabels = {
   complete: 'Complete',
 }
 
-export function OrchestrationNode({ data, isConnecting, selected, id }: OrchestrationNodeProps) {
+export function OrchestrationNode({ data, id }: NodeProps<OrchestrationFlowNode>) {
   const { activeOrchestrationNode } = useAppStore()
   const isActive = activeOrchestrationNode === id
 

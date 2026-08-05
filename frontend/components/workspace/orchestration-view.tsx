@@ -1,18 +1,18 @@
 'use client'
 
-import { ReactFlow, Background, Controls, MiniMap, Node, Edge } from '@xyflow/react'
+import { ReactFlow, Background, Controls, MiniMap, type Edge, type NodeMouseHandler, type NodeTypes } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { motion } from 'framer-motion'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, type OrchestrationNodeId } from '@/lib/store'
 import { useCallback, useMemo } from 'react'
-import { OrchestrationNode } from './orchestration-node'
+import { OrchestrationNode, type OrchestrationFlowNode } from './orchestration-node'
 import { useOrchestrationNodes } from '@/hooks/use-orchestration-nodes'
 
 export function OrchestrationView() {
   const { activeOrchestrationNode, setActiveOrchestrationNode } = useAppStore()
   const { nodes: nodesData, edges: edgesData } = useOrchestrationNodes()
 
-  const nodes: Node[] = useMemo(() => 
+  const nodes: OrchestrationFlowNode[] = useMemo(() =>
     nodesData.map(node => ({
       id: node.id,
       data: {
@@ -37,12 +37,12 @@ export function OrchestrationView() {
     [edgesData]
   )
 
-  const nodeTypes = useMemo(() => ({
+  const nodeTypes: NodeTypes = useMemo(() => ({
     orchestrationNode: OrchestrationNode,
   }), [])
 
-  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    setActiveOrchestrationNode(node.id as any)
+  const handleNodeClick: NodeMouseHandler<OrchestrationFlowNode> = useCallback((_event, node) => {
+    setActiveOrchestrationNode(node.id as OrchestrationNodeId)
   }, [setActiveOrchestrationNode])
 
   return (

@@ -26,12 +26,7 @@ export function WorkspaceClient() {
   const status = useProjectStore((s) => s.status)
   const project = useProjectStore((s) => s.project)
 
-  let projectId: string | null = null
-  try {
-    projectId = useSearchParams()?.get('project') ?? null
-  } catch {
-    projectId = null
-  }
+  const projectId = useSearchParams().get('project')
 
   const [dismissed, setDismissed] = useState(false)
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { useAppUser, useAppAuth } from '@/lib/auth-context'
 import { Menu, Bell, Search, LogIn, Sparkles } from 'lucide-react'
@@ -29,12 +30,12 @@ export function TopNavbar() {
             <Menu className="w-5 h-5 text-muted-foreground" />
           </motion.button>
 
-          <a href="/" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-lg flex items-center justify-center shadow-[0_0_16px_-4px_var(--primary)]">
               <span className="text-black font-bold text-xs">PF</span>
             </div>
             <span className="font-semibold text-foreground hidden sm:inline group-hover:text-primary transition-colors">Plan<span className="text-primary">Forge</span></span>
-          </a>
+          </Link>
           <span className="hidden sm:inline text-muted-foreground/40">/</span>
           <span className="font-medium text-muted-foreground hidden sm:inline truncate max-w-[200px]">{projectTitle}</span>
 

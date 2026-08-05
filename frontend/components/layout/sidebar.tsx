@@ -22,7 +22,7 @@ import {
 interface SidebarItem {
   mode: WorkspaceMode
   label: string
-  icon: React.ReactNode
+  icon: React.ReactElement<{ className?: string }>
 }
 
 interface SidebarGroup {
@@ -106,7 +106,7 @@ export function Sidebar() {
                       whileHover={{ x: sidebarCollapsed ? 0 : 3 }}
                     >
                       <span className="flex-shrink-0">
-                        {React.cloneElement(item.icon as React.ReactElement, {
+                        {React.cloneElement(item.icon, {
                           className: `w-4 h-4 transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`,
                         })}
                       </span>
