@@ -1,6 +1,6 @@
 # ---- Core (spec-required) ----
 dev:
-	docker compose up --build --detach --wait
+	docker compose up --detach --wait
 	@echo "Devflow is ready at http://localhost:3100"
 
 build-dev:
