@@ -4,7 +4,7 @@ Responsibilities:
 * Enqueue analysis jobs onto a Redis queue.
 * Run background worker(s) that pop jobs and drive the workflow.
 * Subscribe to the per-project event channel published by ai-services, persist
-  every event to MongoDB, and append it to a durable Redis buffer so that
+  every event to PostgreSQL, and append it to a durable Redis buffer so that
   late-joining WebSocket clients can replay the full run.
 """
 from __future__ import annotations

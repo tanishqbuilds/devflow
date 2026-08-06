@@ -13,9 +13,12 @@ def _csv(name: str, default: str) -> list[str]:
 class Settings:
     app_version: str = "1.0.0"
     redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    mongo_url: str = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
-    mongo_db: str = os.getenv("MONGO_DB", "devflow")
+    database_url: str = os.getenv(
+        "DATABASE_URL", "postgresql://devflow:devflow@postgres:5432/devflow"
+    )
     ai_services_url: str = os.getenv("AI_SERVICES_URL", "http://ai-services:8001")
+    clerk_secret_key: str = os.getenv("CLERK_SECRET_KEY", "")
+    clerk_issuer_url: str = os.getenv("CLERK_ISSUER_URL", "").rstrip("/")
 
     # Orchestration
     analyze_queue: str = "queue:analyze"

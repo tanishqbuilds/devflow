@@ -2,9 +2,10 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, FileText, Upload, GitBranch, ArrowRight, Loader2, ShieldCheck } from 'lucide-react'
 import { migrateProject, type MigrationSource } from '@/lib/api'
+import { useAppAuth, useAppUser } from '@/lib/auth-context'
 
 const TABS: { id: MigrationSource; label: string; icon: any }[] = [
   { id: 'spec', label: 'Paste spec / tickets', icon: FileText },
@@ -20,6 +21,17 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { isLoaded, isSignedIn } = useAppUser()
+  const { signIn } = useAppAuth()
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [open, onClose])
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -31,6 +43,11 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
   }
 
   const submit = async () => {
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      signIn()
+      return
+    }
     let content = spec.trim()
     if (tab === 'repo') {
       content = `Existing repository to reconstruct a plan from: ${repo.trim()}\n\n${content}`.trim()
@@ -61,17 +78,20 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
         >
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="migration-dialog-title"
             className="relative w-full max-w-xl surface-card p-6 shadow-2xl"
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ type: 'spring', damping: 24, stiffness: 280 }}
           >
-            <button onClick={onClose} className="absolute right-4 top-4 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
+            <button aria-label="Close migration dialog" onClick={onClose} className="absolute right-4 top-4 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold">Bring your existing project into Devflow</h3>
+            <h3 id="migration-dialog-title" className="text-xl font-bold">Bring your existing project into Devflow</h3>
             <p className="mt-1.5 text-sm text-muted-foreground">
               We reconstruct your full plan — milestones, backlog, risks and cost — from what you already have.
             </p>

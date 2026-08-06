@@ -11,7 +11,7 @@ from app.api.projects import agents_router, router as projects_router
 from app.api.stream import router as stream_router
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.db.mongo import close_mongo, get_client, init_indexes
+from app.db.postgres import close_postgres, init_postgres, pool
 from app.db.redis import close_redis, get_redis
 from app.orchestrator.manager import start_workers, stop_workers
 
@@ -22,13 +22,13 @@ START_TIME = time.time()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Devflow backend starting")
-    await init_indexes()
+    await init_postgres()
     start_workers()
     logger.info("Orchestrator workers started (%d)", settings.worker_count)
     yield
     await stop_workers()
     await close_redis()
-    await close_mongo()
+    await close_postgres()
     logger.info("Devflow backend shut down")
 
 
@@ -77,17 +77,18 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"redis": "unknown", "mongodb": "unknown"}
+    dependencies = {"redis": "unknown", "postgres": "unknown"}
     try:
         await get_redis().ping()
         dependencies["redis"] = "healthy"
     except Exception as e:
         dependencies["redis"] = f"unhealthy: {str(e)}"
     try:
-        await get_client().admin.command("ismaster")
-        dependencies["mongodb"] = "healthy"
+        async with pool().acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        dependencies["postgres"] = "healthy"
     except Exception as e:
-        dependencies["mongodb"] = f"unhealthy: {str(e)}"
+        dependencies["postgres"] = f"unhealthy: {str(e)}"
 
     overall = "degraded" if any("unhealthy" in v for v in dependencies.values()) else "healthy"
     return HealthResponse(

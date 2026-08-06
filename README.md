@@ -145,7 +145,7 @@ platform for startups."*), and watch the AI organization work.
 | Frontend | http://localhost:3100 |
 | Backend API + Swagger | http://localhost:8010/docs |
 | AI Services + Swagger | http://localhost:8011/docs |
-| MongoDB | mongodb://localhost:27017 |
+| PostgreSQL | postgresql://devflow:devflow@localhost:5433/devflow |
 | Redis | redis://localhost:6380 |
 
 > Ports are intentionally offset (3100/8010/8011/6380) so Devflow runs alongside other
@@ -165,17 +165,18 @@ GET  /agents                  -> the AI org roster
 WS   /projects/:id/stream     -> snapshot + buffered replay + live orchestration events
 ```
 
-Health checks: `GET /health` on both `:8010` and `:8011` (reports redis / mongodb / llm).
+Health checks: `GET /health` on both `:8010` and `:8011`.
 
 ---
 
 ## 🗄️ Persistence
 
-- **MongoDB** (`devflow.projects`): the canonical project documents + orchestration state.
+- **PostgreSQL**: Clerk users, user-owned project documents, orchestration state, generated
+  AI sections, and assistant chat responses. Projects and responses cascade with their owner.
 - **Redis**: the analysis job queue (`queue:analyze`), the per-project pub/sub event
   channel (`events:{id}`), and a durable event buffer (`events:{id}:buffer`) for WS replay.
-- **Auth**: Clerk when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is set, with a working mock-user
-  fallback otherwise (so the app runs out-of-the-box).
+- **Auth**: Clerk session tokens protect REST and WebSocket project access. The backend verifies
+  every token and scopes every project query to the authenticated Clerk user.
 
 ---
 
@@ -185,11 +186,11 @@ Health checks: `GET /health` on both `:8010` and `:8011` (reports redis / mongod
 | --- | --- |
 | `make dev` | `docker compose up` |
 | `make build-dev` | build + up (full stack) |
-| `make up-backend` | up only backend/ai/redis/mongo |
+| `make up-backend` | up only backend/ai/redis/postgres |
 | `make frontend-dev` | run Next.js locally on :3100 |
 | `make health` | curl both `/health` endpoints |
 | `make logs` / `down` / `prune` | logs / teardown / cleanup |
-| `make backend` / `ai` / `mongo` / `redis` | open a shell/CLI in a container |
+| `make backend` / `ai` / `postgres` / `redis` | open a shell/CLI in a container |
 
 ---
 

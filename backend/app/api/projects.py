@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.auth import CurrentUser, current_user
 from app.core.logging import get_logger
 from app.models.project import (
     AnalyzeRequest,
@@ -22,27 +23,29 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 @router.post("/analyze", response_model=AnalyzeResponse, status_code=202)
-async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
+async def analyze(req: AnalyzeRequest, user: CurrentUser = Depends(current_user)) -> AnalyzeResponse:
     """Kick off the autonomous AI organization on a raw product idea."""
-    doc = await project_service.create_project(req.idea, req.title)
+    doc = await project_service.create_project(req.idea, req.title, user.id)
     await enqueue_analysis(doc["id"])
     return AnalyzeResponse(project_id=doc["id"], status="queued")
 
 
 @router.post("/migrate", response_model=AnalyzeResponse, status_code=202)
-async def migrate(req: MigrateRequest) -> AnalyzeResponse:
+async def migrate(req: MigrateRequest, user: CurrentUser = Depends(current_user)) -> AnalyzeResponse:
     """Reconstruct a full plan from an existing project's spec/export/repo."""
     idea = migration_idea(req.source, req.content)
     title = req.title or f"Imported · {req.content.strip().splitlines()[0][:48]}"
-    doc = await project_service.create_project(idea, title)
+    doc = await project_service.create_project(idea, title, user.id)
     await enqueue_analysis(doc["id"])
     return AnalyzeResponse(project_id=doc["id"], status="queued")
 
 
 @router.post("/{project_id}/chat")
-async def chat(project_id: str, req: ChatRequest) -> dict[str, Any]:
+async def chat(
+    project_id: str, req: ChatRequest, user: CurrentUser = Depends(current_user)
+) -> dict[str, Any]:
     """Answer a question grounded in the project's plan."""
-    doc = await project_service.get_project(project_id)
+    doc = await project_service.get_project(project_id, user.id)
     if not doc:
         raise HTTPException(status_code=404, detail="project not found")
     try:
@@ -52,17 +55,26 @@ async def chat(project_id: str, req: ChatRequest) -> dict[str, Any]:
     except Exception as exc:
         logger.warning("Assistant chat failed for %s: %s", project_id, exc)
         raise HTTPException(status_code=502, detail="assistant unavailable")
-    return {"reply": result.get("reply", "")}
+    reply = result.get("reply", "")
+    await project_service.add_ai_response(
+        project_id, user.id, "chat", role="user", content=req.message
+    )
+    await project_service.add_ai_response(
+        project_id, user.id, "chat", role="assistant", content=reply
+    )
+    return {"reply": reply}
 
 
 @router.get("")
-async def list_projects() -> dict[str, Any]:
-    return {"projects": await project_service.list_projects()}
+async def list_projects(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
+    return {"projects": await project_service.list_projects(user.id)}
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: str) -> dict[str, Any]:
-    doc = await project_service.get_project(project_id)
+async def get_project(
+    project_id: str, user: CurrentUser = Depends(current_user)
+) -> dict[str, Any]:
+    doc = await project_service.get_project(project_id, user.id)
     if not doc:
         raise HTTPException(status_code=404, detail="project not found")
     return doc

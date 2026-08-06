@@ -3,13 +3,13 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
-import { useAppUser, useAppAuth } from '@/lib/auth-context'
+import { useAppUser } from '@/lib/auth-context'
 import { Menu, Bell, Search, LogIn, Sparkles } from 'lucide-react'
+import { SignInButton } from '@clerk/nextjs'
 
 export function TopNavbar() {
   const { projectTitle, sidebarCollapsed, setSidebarCollapsed, aiPanelOpen, setAiPanelOpen, accountPanelOpen, setAccountPanelOpen } = useAppStore()
   const { user, isSignedIn } = useAppUser()
-  const { signIn } = useAppAuth()
 
   return (
     <motion.nav
@@ -100,15 +100,15 @@ export function TopNavbar() {
               />
             </motion.button>
           ) : (
-            <motion.button
-              onClick={signIn}
-              className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-black text-xs font-semibold rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              Sign In
-            </motion.button>
+            <SignInButton mode="modal">
+              <motion.button
+                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-black text-xs font-semibold rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <LogIn className="w-3.5 h-3.5" /> Sign In
+              </motion.button>
+            </SignInButton>
           )}
         </div>
       </div>

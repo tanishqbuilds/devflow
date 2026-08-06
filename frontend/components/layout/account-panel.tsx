@@ -20,7 +20,7 @@ import {
 export function AccountPanel() {
   const { accountPanelOpen, setAccountPanelOpen } = useAppStore()
   const { user, isClerk } = useAppUser()
-  const { signOut, updateProfile } = useAppAuth()
+  const { signOut, signIn, updateProfile } = useAppAuth()
 
   // Inline edit state for mock user
   const [isEditing, setIsEditing] = useState(false)
@@ -230,6 +230,7 @@ CLERK_SECRET_KEY=sk_live_...`}
                 </button>
               ) : (
                 <button
+                  onClick={signIn}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500 text-black rounded-xl text-xs font-semibold hover:bg-cyan-400 transition-all duration-300"
                 >
                   <Lock className="w-4 h-4" />

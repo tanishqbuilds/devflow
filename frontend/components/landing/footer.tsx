@@ -23,27 +23,16 @@ const LINK_COLUMNS: { heading: string; links: FooterLink[] }[] = [
     ],
   },
   {
-    heading: 'Company',
-    links: [
-      { label: 'About', href: '#' },
-      { label: 'Blog', href: '#' },
-      { label: 'Changelog', href: '#' },
-    ],
-  },
-  {
     heading: 'Resources',
     links: [
-      { label: 'Docs', href: '#' },
-      { label: 'Status', href: '#' },
-      { label: 'Privacy', href: '#' },
-      { label: 'Terms', href: '#' },
+      { label: 'Architecture', href: '/architecture' },
     ],
   },
 ]
 
 export function LandingFooter() {
   const handleNav = (href: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (href === '#') return
+    if (href.startsWith('/')) return
     const el = document.querySelector(href)
     if (el) {
       e.preventDefault()

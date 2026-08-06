@@ -1,6 +1,6 @@
 # Devflow Backend API ⚙️
 
-The backend service serves as the core coordinator for the Devflow system. It exposes REST and WebSocket APIs to the frontend and acts as the data-persistence layer, interacting with MongoDB and Redis.
+The backend coordinates authenticated REST/WebSocket APIs and persists Clerk users, projects, and AI responses in PostgreSQL. Redis carries orchestration jobs and live events.
 
 ---
 
@@ -9,7 +9,7 @@ The backend service serves as the core coordinator for the Devflow system. It ex
 - **Framework**: FastAPI (Python 3.11-slim base image)
 - **ASGI Server**: Uvicorn
 - **Object Mapping / Schemas**: Pydantic v2
-- **Database Driver**: Motor (Async driver for MongoDB) / PyMongo
+- **Database Driver**: asyncpg (PostgreSQL)
 - **Cache Client**: `redis-py` (asyncio support)
 
 ---
@@ -21,7 +21,7 @@ backend/
 ├── app/
 │   ├── api/            # API Routers defining routes (e.g., project, task endpoints)
 │   ├── core/           # Configuration management (settings, CORS setup)
-│   ├── db/             # MongoDB and Redis connection clients
+│   ├── db/             # PostgreSQL and Redis connection clients
 │   ├── middleware/     # Custom HTTP request/response middleware
 │   ├── models/         # Pydantic schemas and database entity models
 │   ├── orchestrator/   # Main business logic for workflow generation
@@ -49,12 +49,12 @@ FastAPI automatically generates interactive Swagger documentation, making it eas
   "uptime_seconds": 320.15,
   "dependencies": {
     "redis": "healthy",
-    "mongodb": "healthy"
+    "postgres": "healthy"
   }
 }
 ```
 
-If either Redis or MongoDB fails to reply within the timeout period, the health status will change to `"degraded"` and report the specific error under the failing dependency.
+If Redis or PostgreSQL fails to reply, health changes to `"degraded"` and reports the failing dependency.
 
 ---
 
@@ -68,7 +68,9 @@ Create a `.env` file in the `backend/` directory or set the variables in your en
 
 ```env
 REDIS_URL=redis://localhost:6379/0
-MONGO_URL=mongodb://localhost:27017
+DATABASE_URL=postgresql://devflow:devflow@localhost:5433/devflow
+CLERK_SECRET_KEY=sk_test_...
+CLERK_ISSUER_URL=https://your-instance.clerk.accounts.dev
 ```
 
 ### 2. Set Up Virtual Environment

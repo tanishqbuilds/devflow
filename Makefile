@@ -18,7 +18,7 @@ logs:
 
 # ---- Convenience ----
 up-backend:        ## Bring up only the API stack (no dockerized frontend build)
-	docker compose up -d backend ai-services redis mongodb
+	docker compose up -d backend ai-services redis postgres
 
 restart:
 	docker compose restart
@@ -40,8 +40,8 @@ backend:
 ai:
 	docker compose exec ai-services bash
 
-mongo:
-	docker compose exec mongodb mongosh
+postgres:
+	docker compose exec postgres psql -U devflow -d devflow
 
 redis:
 	docker compose exec redis redis-cli

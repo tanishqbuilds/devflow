@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { getProject, streamUrl } from './api'
+import { getAuthToken, getProject, streamUrl } from './api'
 import { useProjectStore } from './project-store'
 import type { OrchestrationEvent } from './project-types'
 
@@ -27,16 +27,12 @@ export function useOrchestrationStream(projectId: string | null) {
       })
       .catch(() => {})
 
-    let ws: WebSocket
-    try {
-      ws = new WebSocket(streamUrl(projectId))
-    } catch {
-      return () => {
-        closed = true
-      }
-    }
-
-    ws.onmessage = (e) => {
+    let ws: WebSocket | undefined
+    const connect = async () => {
+      const token = await getAuthToken()
+      if (closed || !token) return
+      ws = new WebSocket(streamUrl(projectId, token))
+      ws.onmessage = (e) => {
       let evt: OrchestrationEvent
       try {
         evt = JSON.parse(e.data)
@@ -50,13 +46,15 @@ export function useOrchestrationStream(projectId: string | null) {
           if (!closed) getProject(projectId).then(setProject).catch(() => {})
         }, 500)
       }
+      }
     }
+    void connect()
 
     return () => {
       closed = true
       clearTimeout(refetchTimer)
       try {
-        ws.close()
+        ws?.close()
       } catch {
         /* ignore */
       }

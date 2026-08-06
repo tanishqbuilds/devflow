@@ -11,6 +11,7 @@ import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.core.auth import websocket_user
 from app.core.logging import get_logger
 from app.db.redis import event_buffer_key, event_channel, get_redis
 from app.services import projects as project_service
@@ -21,10 +22,15 @@ router = APIRouter()
 
 @router.websocket("/projects/{project_id}/stream")
 async def stream(websocket: WebSocket, project_id: str) -> None:
+    try:
+        user = await websocket_user(websocket)
+    except Exception:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
     await websocket.accept()
     redis = get_redis()
 
-    doc = await project_service.get_project(project_id)
+    doc = await project_service.get_project(project_id, user.id)
     if not doc:
         await websocket.send_json({"type": "error", "message": "project not found"})
         await websocket.close(code=4404)

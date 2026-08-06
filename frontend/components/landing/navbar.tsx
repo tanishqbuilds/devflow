@@ -2,8 +2,9 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Hexagon, Menu, X } from 'lucide-react'
+import { SignInButton } from '@clerk/nextjs'
+import Link from 'next/link'
 
 const NAV_LINKS = [
   { label: 'How it works', href: '#how' },
@@ -16,7 +17,6 @@ const NAV_LINKS = [
 export function LandingNavbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -28,12 +28,6 @@ export function LandingNavbar() {
   const scrollTo = (href: string) => {
     setMobileOpen(false)
     document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  const startPlanning = () => {
-    setMobileOpen(false)
-    document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth' })
-    setTimeout(() => document.getElementById('idea-input')?.focus(), 600)
   }
 
   return (
@@ -63,6 +57,9 @@ export function LandingNavbar() {
 
         {/* Center links */}
         <div className="hidden md:flex items-center gap-1">
+          <Link href="/architecture" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5 transition-colors">
+            Architecture
+          </Link>
           {NAV_LINKS.map((l) => (
             <button
               key={l.href}
@@ -76,20 +73,11 @@ export function LandingNavbar() {
 
         {/* Right */}
         <div className="hidden md:flex items-center gap-2">
-          <button
-            onClick={() => router.push('/workspace')}
-            className="px-3.5 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors"
-          >
-            Sign in
-          </button>
-          <motion.button
-            onClick={startPlanning}
-            className="px-4 py-1.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:shadow-[0_0_24px_-4px_var(--primary)] transition-shadow"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            Start free
-          </motion.button>
+          <SignInButton mode="modal">
+            <button className="px-3.5 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors">
+              Login
+            </button>
+          </SignInButton>
         </div>
 
         {/* Mobile toggle */}
@@ -106,6 +94,9 @@ export function LandingNavbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
           >
+            <Link href="/architecture" onClick={() => setMobileOpen(false)} className="block w-full text-left px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg">
+              Architecture
+            </Link>
             {NAV_LINKS.map((l) => (
               <button
                 key={l.href}
@@ -115,12 +106,11 @@ export function LandingNavbar() {
                 {l.label}
               </button>
             ))}
-            <button
-              onClick={startPlanning}
-              className="mt-2 w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground"
-            >
-              Start free
-            </button>
+            <SignInButton mode="modal">
+              <button className="mt-2 w-full px-4 py-2.5 text-sm text-foreground border border-white/10 rounded-lg">
+                Login
+              </button>
+            </SignInButton>
           </motion.div>
         )}
       </AnimatePresence>

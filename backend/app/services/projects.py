@@ -1,19 +1,14 @@
-"""Project service — persistence and event application.
-
-Owns the MongoDB project documents and translates orchestration events into
-durable state updates.
-"""
+"""PostgreSQL-backed project persistence and durable AI-response history."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.core.logging import get_logger
-from app.db.mongo import projects
+from app.db.postgres import execute, fetch, fetchrow
 from app.models.project import new_project_doc
 
 logger = get_logger("services.projects")
-
 _MAX_LOGS = 250
 
 
@@ -21,95 +16,105 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def create_project(idea: str, title: Optional[str]) -> dict[str, Any]:
+async def create_project(idea: str, title: Optional[str], user_id: str) -> dict[str, Any]:
     doc = new_project_doc(idea, title)
-    await projects().insert_one(dict(doc))
-    logger.info("Created project %s", doc["id"])
-    doc.pop("_id", None)
+    doc["user_id"] = user_id
+    await execute(
+        """INSERT INTO projects (id, user_id, title, status, progress, document)
+           VALUES ($1, $2, $3, $4, $5, $6)""",
+        doc["id"], user_id, doc["title"], doc["status"], doc["progress"], doc,
+    )
+    logger.info("Created project %s for user %s", doc["id"], user_id)
     return doc
 
 
-async def get_project(project_id: str) -> Optional[dict[str, Any]]:
-    return await projects().find_one({"id": project_id}, {"_id": 0})
-
-
-async def list_projects(limit: int = 50) -> list[dict[str, Any]]:
-    cursor = (
-        projects()
-        .find(
-            {},
-            {"_id": 0, "id": 1, "title": 1, "status": 1, "progress": 1, "created_at": 1, "updated_at": 1},
+async def get_project(project_id: str, user_id: str | None = None) -> Optional[dict[str, Any]]:
+    if user_id is None:
+        row = await fetchrow("SELECT document FROM projects WHERE id=$1", project_id)
+    else:
+        row = await fetchrow(
+            "SELECT document FROM projects WHERE id=$1 AND user_id=$2", project_id, user_id
         )
-        .sort("created_at", -1)
-        .limit(limit)
+    return dict(row["document"]) if row else None
+
+
+async def list_projects(user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    rows = await fetch(
+        """SELECT document FROM projects WHERE user_id=$1
+           ORDER BY created_at DESC LIMIT $2""",
+        user_id, limit,
     )
-    return [doc async for doc in cursor]
+    keys = ("id", "title", "status", "progress", "created_at", "updated_at")
+    return [{key: row["document"].get(key) for key in keys} for row in rows]
+
+
+async def _save_doc(project_id: str, doc: dict[str, Any]) -> None:
+    await execute(
+        """UPDATE projects SET title=$2, status=$3, progress=$4, document=$5,
+           updated_at=NOW() WHERE id=$1""",
+        project_id, doc["title"], doc["status"], doc["progress"], doc,
+    )
 
 
 async def set_status(
     project_id: str, status: str, *, progress: Optional[int] = None, error: Optional[str] = None
 ) -> None:
-    update: dict[str, Any] = {"status": status, "updated_at": _now()}
+    doc = await get_project(project_id)
+    if not doc:
+        return
+    doc["status"] = status
+    doc["updated_at"] = _now()
     if progress is not None:
-        update["progress"] = progress
+        doc["progress"] = progress
     if error is not None:
-        update["error"] = error
-    await projects().update_one({"id": project_id}, {"$set": update})
+        doc["error"] = error
+    await _save_doc(project_id, doc)
+
+
+async def add_ai_response(
+    project_id: str,
+    user_id: str,
+    kind: str,
+    *,
+    role: str = "assistant",
+    content: str | None = None,
+    payload: Any = None,
+) -> None:
+    await execute(
+        """INSERT INTO ai_responses (project_id, user_id, kind, role, content, payload)
+           VALUES ($1, $2, $3, $4, $5, $6)""",
+        project_id, user_id, kind, role, content, payload,
+    )
 
 
 async def apply_event(project_id: str, event: dict[str, Any]) -> None:
-    """Translate a single orchestration event into a Mongo update."""
+    doc = await get_project(project_id)
+    if not doc:
+        return
     etype = event.get("type")
     now = _now()
-
-    if etype == "node_update":
-        node = event.get("node")
-        if not node:
-            return
-        await projects().update_one(
-            {"id": project_id},
-            {
-                "$set": {
-                    f"orchestration.nodes.{node}.status": event.get("status", "idle"),
-                    f"orchestration.nodes.{node}.progress": event.get("progress", 0),
-                    "orchestration.current_node": node,
-                    "updated_at": now,
-                }
-            },
+    if etype == "node_update" and event.get("node"):
+        node = event["node"]
+        doc["orchestration"]["nodes"][node].update(
+            status=event.get("status", "idle"), progress=event.get("progress", 0)
         )
-
+        doc["orchestration"]["current_node"] = node
     elif etype == "log":
-        entry = {
-            "agent": event.get("agent"),
-            "level": event.get("level", "info"),
-            "message": event.get("message", ""),
-            "ts": event.get("ts"),
-        }
-        await projects().update_one(
-            {"id": project_id},
-            {
-                "$push": {"orchestration.logs": {"$each": [entry], "$slice": -_MAX_LOGS}},
-                "$set": {"updated_at": now},
-            },
+        doc["orchestration"]["logs"] = (doc["orchestration"]["logs"] + [{
+            "agent": event.get("agent"), "level": event.get("level", "info"),
+            "message": event.get("message", ""), "ts": event.get("ts"),
+        }])[-_MAX_LOGS:]
+    elif etype == "section_complete" and event.get("section"):
+        section = event["section"]
+        doc[section] = event.get("data")
+        await add_ai_response(
+            project_id, doc["user_id"], f"section:{section}", payload=event.get("data")
         )
-
-    elif etype == "section_complete":
-        section = event.get("section")
-        if not section:
-            return
-        await projects().update_one(
-            {"id": project_id},
-            {"$set": {section: event.get("data"), "updated_at": now}},
-        )
-
     elif etype == "progress":
-        await projects().update_one(
-            {"id": project_id},
-            {"$set": {"progress": event.get("progress", 0), "updated_at": now}},
-        )
-
+        doc["progress"] = event.get("progress", 0)
     elif etype == "error":
-        await projects().update_one(
-            {"id": project_id},
-            {"$set": {"error": event.get("message"), "updated_at": now}},
-        )
+        doc["error"] = event.get("message")
+    else:
+        return
+    doc["updated_at"] = now
+    await _save_doc(project_id, doc)

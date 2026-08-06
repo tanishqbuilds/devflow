@@ -2,7 +2,7 @@
 
 The workflow engine publishes events to a Redis pub/sub channel
 (``events:{project_id}``) as it runs. The backend subscribes to this channel to
-(a) persist section outputs to MongoDB and (b) relay events to the browser over
+(a) persist section outputs to PostgreSQL and (b) relay events to the browser over
 WebSockets. Events also carry a monotonically increasing ``seq`` for ordering.
 """
 from __future__ import annotations

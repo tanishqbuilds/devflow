@@ -4,6 +4,23 @@
 import type { ProjectDoc } from './project-types'
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8010').replace(/\/$/, '')
+let tokenProvider: (() => Promise<string | null>) | null = null
+
+export function setAuthTokenProvider(provider: (() => Promise<string | null>) | null) {
+  tokenProvider = provider
+}
+
+export async function getAuthToken(): Promise<string | null> {
+  return tokenProvider?.() ?? null
+}
+
+async function authHeaders(json = false): Promise<HeadersInit> {
+  const token = await getAuthToken()
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
 
 export function apiBase(): string {
   return API_BASE
@@ -15,8 +32,8 @@ export function wsBase(): string {
   return API_BASE.replace(/^http/, 'ws')
 }
 
-export function streamUrl(projectId: string): string {
-  return `${wsBase()}/projects/${projectId}/stream`
+export function streamUrl(projectId: string, token: string): string {
+  return `${wsBase()}/projects/${projectId}/stream?token=${encodeURIComponent(token)}`
 }
 
 async function jsonOrThrow(res: Response) {
@@ -39,7 +56,7 @@ export async function analyzeProject(
 ): Promise<{ project_id: string; status: string }> {
   const res = await fetch(`${API_BASE}/projects/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(true),
     body: JSON.stringify({ idea, title }),
   })
   return jsonOrThrow(res)
@@ -59,7 +76,7 @@ export async function migrateProject(payload: {
 }): Promise<{ project_id: string; status: string }> {
   const res = await fetch(`${API_BASE}/projects/migrate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(true),
     body: JSON.stringify(payload),
   })
   return jsonOrThrow(res)
@@ -73,19 +90,21 @@ export async function askAssistant(
 ): Promise<{ reply: string }> {
   const res = await fetch(`${API_BASE}/projects/${projectId}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(true),
     body: JSON.stringify({ message, history }),
   })
   return jsonOrThrow(res)
 }
 
 export async function getProject(projectId: string): Promise<ProjectDoc> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${projectId}`, {
+    cache: 'no-store', headers: await authHeaders(),
+  })
   return jsonOrThrow(res)
 }
 
 export async function listProjects(): Promise<{ projects: Partial<ProjectDoc>[] }> {
-  const res = await fetch(`${API_BASE}/projects`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects`, { cache: 'no-store', headers: await authHeaders() })
   return jsonOrThrow(res)
 }
 

@@ -1,9 +1,10 @@
 import { MainLayout } from '@/components/layout/main-layout'
+import { WorkspaceAuthGate } from '@/components/auth/workspace-auth-gate'
 
 export default function WorkspaceLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return <MainLayout>{children}</MainLayout>
+  return <WorkspaceAuthGate><MainLayout>{children}</MainLayout></WorkspaceAuthGate>
 }

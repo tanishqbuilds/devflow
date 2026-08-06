@@ -8,7 +8,6 @@ import uvicorn
 from fastapi import FastAPI, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
 from api.routes import router as api_router
@@ -53,7 +52,6 @@ async def custom_swagger_ui_html():
 
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
 APP_VERSION = "1.0.0"
 START_TIME = time.time()
 
@@ -67,7 +65,7 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"redis": "unknown", "mongodb": "unknown", "llm": "unknown"}
+    dependencies = {"redis": "unknown", "llm": "unknown"}
 
     try:
         r = aioredis.from_url(REDIS_URL, socket_timeout=2.0)
@@ -76,13 +74,6 @@ async def health_check():
         dependencies["redis"] = "healthy"
     except Exception as e:
         dependencies["redis"] = f"unhealthy: {str(e)}"
-
-    try:
-        client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=2000)
-        await client.admin.command("ismaster")
-        dependencies["mongodb"] = "healthy"
-    except Exception as e:
-        dependencies["mongodb"] = f"unhealthy: {str(e)}"
 
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")

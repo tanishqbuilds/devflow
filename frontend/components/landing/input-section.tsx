@@ -4,8 +4,10 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, Wand2 } from 'lucide-react'
+import { useClerk } from '@clerk/nextjs'
 import { analyzeProject } from '@/lib/api'
 import { Reveal } from './reveal'
+import { useAppUser } from '@/lib/auth-context'
 
 const EXAMPLES = [
   'AI-powered recruitment platform that screens candidates for startups',
@@ -21,6 +23,8 @@ export function InputSection() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { isLoaded, isSignedIn } = useAppUser()
+  const { redirectToSignIn } = useClerk()
 
   // Rotating typewriter placeholder
   useEffect(() => {
@@ -30,7 +34,8 @@ export function InputSection() {
     setPlaceholder('')
     const type = setInterval(() => {
       if (i < phrase.length) {
-        setPlaceholder((p) => p + phrase[i])
+        const nextCharacter = phrase[i]
+        setPlaceholder((p) => p + nextCharacter)
         i++
       } else {
         clearInterval(type)
@@ -48,6 +53,11 @@ export function InputSection() {
     const idea = input.trim()
     if (idea.length < 8 || submitting) {
       if (idea.length < 8) setError('Add a little more detail (at least 8 characters).')
+      return
+    }
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      await redirectToSignIn({ redirectUrl: window.location.href })
       return
     }
     setSubmitting(true)
