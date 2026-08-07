@@ -29,20 +29,17 @@ async def create_project(idea: str, title: Optional[str], user_id: str) -> dict[
 
 
 async def get_project(project_id: str, user_id: str | None = None) -> Optional[dict[str, Any]]:
-    if user_id is None:
-        row = await fetchrow("SELECT document FROM projects WHERE id=$1", project_id)
-    else:
-        row = await fetchrow(
-            "SELECT document FROM projects WHERE id=$1 AND user_id=$2", project_id, user_id
-        )
+    # In collaborative MVP, all users can see all projects.
+    row = await fetchrow("SELECT document FROM projects WHERE id=$1", project_id)
     return dict(row["document"]) if row else None
 
 
 async def list_projects(user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    # In collaborative MVP, all users can see all projects.
     rows = await fetch(
-        """SELECT document FROM projects WHERE user_id=$1
-           ORDER BY created_at DESC LIMIT $2""",
-        user_id, limit,
+        """SELECT document FROM projects
+           ORDER BY created_at DESC LIMIT $1""",
+        limit,
     )
     keys = ("id", "title", "status", "progress", "created_at", "updated_at")
     return [{key: row["document"].get(key) for key in keys} for row in rows]
@@ -69,6 +66,16 @@ async def set_status(
     if error is not None:
         doc["error"] = error
     await _save_doc(project_id, doc)
+
+
+async def update_section(project_id: str, section: str, data: Any) -> bool:
+    doc = await get_project(project_id)
+    if not doc:
+        return False
+    doc[section] = data
+    doc["updated_at"] = _now()
+    await _save_doc(project_id, doc)
+    return True
 
 
 async def add_ai_response(

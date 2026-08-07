@@ -67,3 +67,6 @@ docker-compose.override.yml
 # Local validation artifacts
 .validation/
 dev.log
+
+# clerk configuration (can include secrets)
+/.clerk/

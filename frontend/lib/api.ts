@@ -112,3 +112,32 @@ export async function getAgents(): Promise<{ agents: { id: string; name: string;
   const res = await fetch(`${API_BASE}/agents`, { cache: 'no-store' })
   return jsonOrThrow(res)
 }
+
+export async function syncUser(payload: {
+  clerk_id: string
+  email: string
+  first_name: string
+  last_name: string
+  image_url: string
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/users/sync`, {
+    method: 'POST',
+    headers: await authHeaders(true),
+    body: JSON.stringify(payload),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function getUsers(): Promise<{ users: any[] }> {
+  const res = await fetch(`${API_BASE}/users`, { cache: 'no-store', headers: await authHeaders() })
+  return jsonOrThrow(res)
+}
+
+export async function updateBacklog(projectId: string, backlog: any): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/backlog`, {
+    method: 'PUT',
+    headers: await authHeaders(true),
+    body: JSON.stringify({ backlog }),
+  })
+  return jsonOrThrow(res)
+}

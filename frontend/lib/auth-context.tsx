@@ -1,8 +1,8 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useMemo } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth, useClerk, useUser } from '@clerk/nextjs'
-import { setAuthTokenProvider } from './api'
+import { setAuthTokenProvider, syncUser } from './api'
 
 interface AppUser {
   id: string
@@ -11,6 +11,7 @@ interface AppUser {
   fullName: string
   imageUrl: string
   primaryEmailAddress: { emailAddress: string }
+  role?: 'manager' | 'developer'
 }
 
 interface AuthContextType {
@@ -30,11 +31,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isSignedIn, isLoaded } = useUser()
   const { getToken } = useAuth()
   const { signOut, openSignIn } = useClerk()
+  const [role, setRole] = useState<'manager' | 'developer'>('developer')
 
   useEffect(() => {
     setAuthTokenProvider(() => getToken())
     return () => setAuthTokenProvider(null)
   }, [getToken])
+
+  useEffect(() => {
+    if (user && isSignedIn) {
+      syncUser({
+        clerk_id: user.id,
+        email: user.primaryEmailAddress?.emailAddress ?? '',
+        first_name: user.firstName ?? '',
+        last_name: user.lastName ?? '',
+        image_url: user.imageUrl,
+      }).then(res => {
+        if (res?.role) setRole(res.role)
+      }).catch(console.error)
+    }
+  }, [user, isSignedIn])
 
   const value = useMemo<AuthContextType>(() => ({
     isSignedIn: isSignedIn ?? false,
@@ -46,13 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fullName: user.fullName ?? user.primaryEmailAddress?.emailAddress ?? 'Account',
       imageUrl: user.imageUrl,
       primaryEmailAddress: { emailAddress: user.primaryEmailAddress?.emailAddress ?? '' },
+      role,
     } : null,
     signOut: async () => { await signOut({ redirectUrl: '/' }) },
     signIn: () => { void openSignIn() },
     updateProfile: () => {},
     isClerk: true,
     getToken,
-  }), [getToken, isLoaded, isSignedIn, openSignIn, signOut, user])
+  }), [getToken, isLoaded, isSignedIn, openSignIn, signOut, user, role])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

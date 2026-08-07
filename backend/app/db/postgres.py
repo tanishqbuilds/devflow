@@ -19,9 +19,11 @@ CREATE TABLE IF NOT EXISTS users (
     first_name TEXT,
     last_name TEXT,
     image_url TEXT,
+    role TEXT NOT NULL DEFAULT 'developer',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'developer';
 CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,

@@ -23,10 +23,11 @@ export function InputSection() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const { isLoaded, isSignedIn } = useAppUser()
+  const { isLoaded, isSignedIn, user } = useAppUser()
   const { redirectToSignIn } = useClerk()
 
   // Rotating typewriter placeholder
+  // NOTE: All hooks must be called before any conditional return (Rules of Hooks)
   useEffect(() => {
     if (input) return
     const phrase = EXAMPLES[exampleIdx]
@@ -47,6 +48,23 @@ export function InputSection() {
       clearTimeout(next)
     }
   }, [exampleIdx, input])
+
+  if (user?.role === 'developer') {
+    return (
+      <section className="relative px-4 py-16 sm:py-20 flex justify-center">
+         <div className="glass-panel p-8 text-center max-w-md rounded-xl">
+             <h2 className="text-2xl font-bold text-foreground">Welcome back!</h2>
+             <p className="text-muted-foreground mt-2">Head over to your workspace to view your assigned tasks across all projects.</p>
+             <button 
+                onClick={() => router.push('/my-tasks')} 
+                className="mt-6 bg-primary text-primary-foreground font-semibold px-6 py-2.5 rounded-lg hover:opacity-90"
+             >
+                Go to My Tasks
+             </button>
+         </div>
+      </section>
+    )
+  }
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()

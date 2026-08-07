@@ -1,8 +1,11 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { LayoutGrid, Clock, Layers, Link2, Target, ListChecks, Gauge } from 'lucide-react'
+import { LayoutGrid, Clock, Layers, Link2, Target, ListChecks, Gauge, ChevronDown, UserCircle2 } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
+import { useEffect, useState } from 'react'
+import { getUsers, updateBacklog } from '@/lib/api'
+import { useAppUser } from '@/lib/auth-context'
 
 const priorityPill: Record<string, string> = {
   critical: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
@@ -17,9 +20,20 @@ const loadBarColor: Record<string, string> = {
   low: 'from-cyan-400 to-emerald-400',
 }
 
+const KANBAN_COLUMNS = ['To Do', 'In Progress', 'In Review', 'Done']
+
 export function SprintBoardView() {
   const project = useProjectStore((s) => s.project)
+  const setProject = useProjectStore((s) => s.setProject)
   const backlog = project?.backlog || null
+  const { user: currentUser } = useAppUser()
+
+  const [viewMode, setViewMode] = useState<'sprint' | 'kanban'>('kanban')
+  const [users, setUsers] = useState<any[]>([])
+  
+  useEffect(() => {
+    getUsers().then(res => setUsers(res.users || [])).catch(console.error)
+  }, [])
 
   if (!backlog) {
     return (
@@ -47,88 +61,168 @@ export function SprintBoardView() {
 
   const tasks = backlog.tasks || []
   const sprints = [...(backlog.sprints || [])].sort((a, b) => a.number - b.number)
-  const totalDays = tasks.reduce((sum, t) => sum + (t.estimated_days || 0), 0)
+  const totalDays = tasks.reduce((sum: number, t: any) => sum + (t.estimated_days || 0), 0)
 
-  const tasksForSprint = (sprint: (typeof sprints)[number]) => {
-    const byNumber = tasks.filter((t) => t.sprint === sprint.number)
-    if (byNumber.length > 0) return byNumber
-    const titleSet = new Set(sprint.task_titles || [])
-    return tasks.filter((t) => titleSet.has(t.title))
+  // Ensure tasks have statuses
+  const normalizedTasks = tasks.map((t: any) => ({ ...t, status: t.status || 'To Do' }))
+
+  const updateTask = async (taskTitle: string, updates: Partial<any>) => {
+    if (!project) return
+    const newTasks = normalizedTasks.map((t: any) => t.title === taskTitle ? { ...t, ...updates } : t)
+    const newBacklog = { ...backlog, tasks: newTasks }
+    
+    // Optimistic UI update
+    setProject({ ...project, backlog: newBacklog })
+    
+    try {
+      await updateBacklog(project.id, newBacklog)
+    } catch (err) {
+      console.error("Failed to update task", err)
+      // Rollback
+      setProject({ ...project, backlog })
+    }
   }
 
-  // Reference capacity = the heaviest sprint, used to scale the per-column load bars.
-  const sprintDays = sprints.map((s) => tasksForSprint(s).reduce((sum, t) => sum + (t.estimated_days || 0), 0))
-  const maxSprintDays = Math.max(1, ...sprintDays)
+  const handleDrop = (e: React.DragEvent, status: string) => {
+    e.preventDefault()
+    const taskTitle = e.dataTransfer.getData('text/plain')
+    if (taskTitle) {
+      updateTask(taskTitle, { status })
+    }
+  }
 
-  const summary = [
-    { icon: ListChecks, label: 'Tasks', value: String(tasks.length) },
-    { icon: Clock, label: 'Dev-days', value: `~${Math.round(totalDays)}` },
-    { icon: Layers, label: 'Sprints', value: String(sprints.length) },
-    { icon: Target, label: 'Methodology', value: backlog.methodology || '—' },
-  ]
+  const renderTaskCard = (task: any, idx: number) => {
+    const deps = task.dependencies?.length || 0
+    return (
+      <motion.div
+        key={`${task.title}-${idx}`}
+        draggable
+        onDragStart={(e: any) => e.dataTransfer.setData('text/plain', task.title)}
+        className="p-3 bg-card/60 border border-white/10 rounded-lg hover:border-primary/50 hover:bg-card/80 transition-colors cursor-grab active:cursor-grabbing"
+        whileHover={{ y: -3 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="font-medium text-sm text-foreground leading-snug">{task.title}</p>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${priorityPill[task.priority] || priorityPill.medium}`}>
+            {task.priority || 'medium'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {task.category && (
+            <span className="text-[10px] uppercase tracking-wide text-secondary bg-[#7c3aed]/15 border border-[#7c3aed]/25 px-2 py-0.5 rounded">
+              {task.category}
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
+            <Clock className="w-3 h-3" /> {task.estimated_days}d
+          </span>
+          {deps > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-cyan-400/80 bg-cyan-500/10 px-2 py-0.5 rounded">
+              <Link2 className="w-3 h-3" /> {deps} {deps === 1 ? 'dep' : 'deps'}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2">
+           <div className="relative group">
+              <select 
+                className="appearance-none bg-transparent text-[11px] text-muted-foreground hover:text-foreground cursor-pointer outline-none w-32 truncate"
+                value={task.assignee_id || ''}
+                onChange={(e) => updateTask(task.title, { assignee_id: e.target.value })}
+                disabled={currentUser?.role === 'developer' && task.assignee_id && task.assignee_id !== currentUser.id}
+              >
+                <option value="">Unassigned</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+                ))}
+              </select>
+           </div>
+           {task.epic && (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1 max-w-[100px] truncate" title={task.epic}>
+              <Layers className="w-3 h-3 flex-shrink-0" /> {task.epic}
+            </p>
+          )}
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-      <div>
-        <h2 className="text-3xl font-bold text-foreground mb-2">Sprint Board</h2>
-        <p className="text-muted-foreground">
-          A live agile board — {sprints.length} sprints · {backlog.sprint_length_weeks ? `${backlog.sprint_length_weeks}-week cadence · ` : ''}
-          drag-free planning view of every task
-        </p>
-      </div>
-
-      {/* Summary row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {summary.map((item, idx) => (
-          <motion.div
-            key={item.label}
-            className="glass-panel p-5 rounded-xl flex items-center gap-3"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.05 }}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground mb-2">Sprint Board</h2>
+          <p className="text-muted-foreground">
+            A live agile board — {sprints.length} sprints · drag and drop tasks to update progress
+          </p>
+        </div>
+        <div className="flex bg-card border border-white/10 rounded-lg p-1">
+          <button 
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('kanban')}
           >
-            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-              <item.icon className="w-5 h-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</p>
-              <p className="text-lg font-bold text-foreground truncate capitalize">{item.value}</p>
-            </div>
-          </motion.div>
-        ))}
+            Kanban
+          </button>
+          <button 
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'sprint' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setViewMode('sprint')}
+          >
+            Sprint Timeline
+          </button>
+        </div>
       </div>
 
-      {/* Board */}
-      {sprints.length === 0 ? (
-        <div className="glass-panel p-8 rounded-xl text-sm text-muted-foreground">No sprints have been planned yet.</div>
+      {viewMode === 'kanban' ? (
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+          {KANBAN_COLUMNS.map((colName) => {
+            const colTasks = normalizedTasks.filter((t: any) => t.status === colName)
+            return (
+              <div
+                key={colName}
+                className="glass-panel-dark p-4 rounded-xl flex-shrink-0 w-[300px] flex flex-col h-full min-h-[400px]"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, colName)}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">{colName}</h3>
+                  <span className="text-xs font-mono text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
+                    {colTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-3 flex-1">
+                  {colTasks.map((task: any, idx: number) => renderTaskCard(task, idx))}
+                  {colTasks.length === 0 && (
+                    <div className="border border-dashed border-white/10 rounded-lg p-4 text-center text-xs text-muted-foreground opacity-50">
+                      Drop tasks here
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
           {sprints.map((sprint, sIdx) => {
-            const colTasks = tasksForSprint(sprint)
-            const colDays = sprintDays[sIdx]
+            const colTasks = normalizedTasks.filter((t: any) => t.sprint === sprint.number)
+            const colDays = colTasks.reduce((sum: number, t: any) => sum + (t.estimated_days || 0), 0)
+            const maxSprintDays = Math.max(1, ...sprints.map(s => normalizedTasks.filter((t:any) => t.sprint === s.number).reduce((sum:number, t:any) => sum + (t.estimated_days || 0), 0)))
             const loadRatio = Math.min(1, colDays / maxSprintDays)
             const loadKey = loadRatio > 0.75 ? 'high' : loadRatio > 0.4 ? 'medium' : 'low'
 
             return (
-              <motion.div
-                key={sprint.number}
-                className="glass-panel-dark p-4 rounded-xl flex-shrink-0 w-[280px] flex flex-col"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + sIdx * 0.06 }}
-              >
-                {/* Column header */}
+              <div key={sprint.number} className="glass-panel-dark p-4 rounded-xl flex-shrink-0 w-[280px] flex flex-col">
                 <div className="mb-4">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-primary uppercase tracking-wider">Sprint {sprint.number}</span>
                     <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
-                      {colTasks.length} {colTasks.length === 1 ? 'task' : 'tasks'}
+                      {colTasks.length} tasks
                     </span>
                   </div>
                   <h3 className="text-base font-semibold text-foreground mt-1 leading-snug">{sprint.name}</h3>
-                  {sprint.goal && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{sprint.goal}</p>}
-
-                  {/* Capacity / load bar */}
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
                       <span className="flex items-center gap-1">
@@ -137,68 +231,14 @@ export function SprintBoardView() {
                       <span className="font-semibold text-foreground/80">{Math.round(colDays)}d</span>
                     </div>
                     <div className="h-1.5 bg-card rounded-full overflow-hidden">
-                      <motion.div
-                        className={`h-full bg-gradient-to-r ${loadBarColor[loadKey]}`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.max(4, loadRatio * 100)}%` }}
-                        transition={{ duration: 0.8, delay: 0.2 + sIdx * 0.06 }}
-                      />
+                      <div className={`h-full bg-gradient-to-r ${loadBarColor[loadKey]}`} style={{ width: `${Math.max(4, loadRatio * 100)}%` }} />
                     </div>
                   </div>
                 </div>
-
-                {/* Task cards */}
                 <div className="space-y-3 flex-1">
-                  {colTasks.map((task, idx) => {
-                    const deps = task.dependencies?.length || 0
-                    return (
-                      <motion.div
-                        key={`${task.title}-${idx}`}
-                        className="p-3 bg-card/60 border border-white/10 rounded-lg hover:border-primary/50 hover:bg-card/80 transition-colors"
-                        whileHover={{ y: -3 }}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 + sIdx * 0.06 + idx * 0.03 }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm text-foreground leading-snug">{task.title}</p>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${priorityPill[task.priority] || priorityPill.medium}`}>
-                            {task.priority}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          {task.category && (
-                            <span className="text-[10px] uppercase tracking-wide text-secondary bg-[#7c3aed]/15 border border-[#7c3aed]/25 px-2 py-0.5 rounded">
-                              {task.category}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
-                            <Clock className="w-3 h-3" /> {task.estimated_days}d
-                          </span>
-                          {deps > 0 && (
-                            <span className="flex items-center gap-1 text-[10px] text-cyan-400/80 bg-cyan-500/10 px-2 py-0.5 rounded">
-                              <Link2 className="w-3 h-3" /> {deps} {deps === 1 ? 'dep' : 'deps'}
-                            </span>
-                          )}
-                        </div>
-
-                        {task.epic && (
-                          <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1 truncate">
-                            <Layers className="w-3 h-3 flex-shrink-0" /> {task.epic}
-                          </p>
-                        )}
-                      </motion.div>
-                    )
-                  })}
-
-                  {colTasks.length === 0 && (
-                    <div className="border border-dashed border-white/10 rounded-lg p-4 text-center text-xs text-muted-foreground">
-                      No tasks in this sprint
-                    </div>
-                  )}
+                  {colTasks.map((task: any, idx: number) => renderTaskCard(task, idx))}
                 </div>
-              </motion.div>
+              </div>
             )
           })}
         </div>

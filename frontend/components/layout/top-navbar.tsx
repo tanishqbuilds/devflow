@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { useAppUser } from '@/lib/auth-context'
-import { Menu, Bell, Search, LogIn, Sparkles } from 'lucide-react'
+import { Menu, Bell, Search, LogIn, Sparkles, ListChecks } from 'lucide-react'
 import { SignInButton } from '@clerk/nextjs'
 
 export function TopNavbar() {
@@ -69,6 +69,18 @@ export function TopNavbar() {
             <Bell className="w-5 h-5 text-muted-foreground" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </motion.button>
+
+          {/* My Tasks */}
+          <Link href="/my-tasks">
+            <motion.button
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <ListChecks className="w-4 h-4" />
+              <span className="hidden sm:inline">My Tasks</span>
+            </motion.button>
+          </Link>
 
           {/* Copilot Toggle */}
           <motion.button

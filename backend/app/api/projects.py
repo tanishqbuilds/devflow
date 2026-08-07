@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.core.auth import CurrentUser, current_user
 from app.core.logging import get_logger
@@ -71,13 +72,23 @@ async def list_projects(user: CurrentUser = Depends(current_user)) -> dict[str, 
 
 
 @router.get("/{project_id}")
-async def get_project(
-    project_id: str, user: CurrentUser = Depends(current_user)
-) -> dict[str, Any]:
+async def get_project(project_id: str, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
     doc = await project_service.get_project(project_id, user.id)
     if not doc:
         raise HTTPException(status_code=404, detail="project not found")
     return doc
+
+
+class UpdateBacklogRequest(BaseModel):
+    backlog: dict[str, Any]
+
+
+@router.put("/{project_id}/backlog")
+async def update_backlog(project_id: str, req: UpdateBacklogRequest) -> dict[str, Any]:
+    success = await project_service.update_section(project_id, "backlog", req.backlog)
+    if not success:
+        raise HTTPException(status_code=404, detail="project not found")
+    return {"status": "ok"}
 
 
 agents_router = APIRouter(tags=["agents"])
