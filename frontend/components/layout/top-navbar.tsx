@@ -4,12 +4,12 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { useAppUser } from '@/lib/auth-context'
-import { Menu, Bell, Search, LogIn, Sparkles, ListChecks } from 'lucide-react'
+import { Menu, Bell, Search, LogIn, Sparkles, ListChecks, FolderKanban } from 'lucide-react'
 import { SignInButton } from '@clerk/nextjs'
 
 export function TopNavbar() {
   const { projectTitle, sidebarCollapsed, setSidebarCollapsed, aiPanelOpen, setAiPanelOpen, accountPanelOpen, setAccountPanelOpen } = useAppStore()
-  const { user, isSignedIn } = useAppUser()
+  const { user, isSignedIn, isLoaded } = useAppUser()
 
   return (
     <motion.nav
@@ -70,6 +70,18 @@ export function TopNavbar() {
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </motion.button>
 
+          {/* My Projects */}
+          <Link href="/my-projects">
+            <motion.button
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FolderKanban className="w-4 h-4" />
+              <span className="hidden sm:inline">My Projects</span>
+            </motion.button>
+          </Link>
+
           {/* My Tasks */}
           <Link href="/my-tasks">
             <motion.button
@@ -98,7 +110,10 @@ export function TopNavbar() {
           </motion.button>
 
           {/* User Section */}
-          {isSignedIn && user ? (
+          {/* User Section */}
+          {!isLoaded ? (
+            <div className="w-10 h-10 rounded-xl bg-white/5 animate-pulse" />
+          ) : isSignedIn && user ? (
             <motion.button
               onClick={() => setAccountPanelOpen(!accountPanelOpen)}
               className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all flex items-center justify-center bg-card"

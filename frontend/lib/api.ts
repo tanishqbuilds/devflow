@@ -50,6 +50,7 @@ async function jsonOrThrow(res: Response) {
   return res.json()
 }
 
+
 export async function analyzeProject(
   idea: string,
   title?: string,
