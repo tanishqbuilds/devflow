@@ -4,141 +4,115 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { useAppUser } from '@/lib/auth-context'
-import { Menu, Bell, Search, LogIn, Sparkles, ListChecks, FolderKanban } from 'lucide-react'
+import { Menu, Search, LogIn, Sparkles, ListChecks, FolderKanban, Cpu } from 'lucide-react'
 import { useClerk } from '@clerk/nextjs'
 
 export function TopNavbar() {
-  const { projectTitle, sidebarCollapsed, setSidebarCollapsed, aiPanelOpen, setAiPanelOpen, accountPanelOpen, setAccountPanelOpen } = useAppStore()
+  const {
+    projectTitle,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    aiPanelOpen,
+    setAiPanelOpen,
+    accountPanelOpen,
+    setAccountPanelOpen,
+  } = useAppStore()
   const { user, isSignedIn, isLoaded } = useAppUser()
   const { openSignIn } = useClerk()
 
   return (
-    <motion.nav
-      className="fixed top-0 left-0 right-0 z-40 px-6 py-4 bg-background/40 backdrop-blur-xl border-b border-white/5"
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
-      <div className="flex items-center justify-between gap-6">
+    <nav className="fixed top-0 left-0 right-0 z-40 px-5 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
+      <div className="flex items-center justify-between gap-4">
         {/* Left side */}
-        <div className="flex items-center gap-4">
-          <motion.button
+        <div className="flex items-center gap-3">
+          <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-2 hover:bg-slate-100 text-slate-500 hover:text-slate-900 rounded-lg transition-colors"
+            title="Toggle Sidebar"
           >
-            <Menu className="w-5 h-5 text-muted-foreground" />
-          </motion.button>
+            <Menu className="w-5 h-5" />
+          </button>
 
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-violet-500 rounded-lg flex items-center justify-center shadow-[0_0_16px_-4px_var(--primary)]">
-              <span className="text-black font-bold text-xs">PF</span>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-xs shadow-sm">
+              DF
             </div>
-            <span className="font-semibold text-foreground hidden sm:inline group-hover:text-primary transition-colors">Plan<span className="text-primary">Forge</span></span>
+            <span className="font-bold text-slate-900 text-base tracking-tight hidden sm:inline">
+              Dev<span className="text-blue-600">flow</span>
+            </span>
           </Link>
-          <span className="hidden sm:inline text-muted-foreground/40">/</span>
-          <span className="font-medium text-muted-foreground hidden sm:inline truncate max-w-[200px]">{projectTitle}</span>
+          
+          {projectTitle && (
+            <>
+              <span className="hidden sm:inline text-slate-300">/</span>
+              <span className="font-medium text-slate-600 text-sm hidden sm:inline truncate max-w-[240px]">
+                {projectTitle}
+              </span>
+            </>
+          )}
 
           {/* Status Badge */}
-          <motion.div
-            className="ml-4 px-3 py-1 bg-card/50 border border-white/10 rounded-full text-xs text-muted-foreground flex items-center gap-2"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <div className="w-2 h-2 bg-primary rounded-full animate-pulse-glow" />
-            Orchestration Ready
-          </motion.div>
+          <div className="hidden md:inline-flex items-center gap-1.5 ml-2 px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            AI Pipeline Ready
+          </div>
         </div>
 
         {/* Right side */}
         <div className="flex items-center gap-2 ml-auto">
-          {/* Search */}
-          <motion.button
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors hidden md:flex"
-            whileHover={{ scale: 1.05 }}
-          >
-            <Search className="w-5 h-5 text-muted-foreground" />
-          </motion.button>
-
-          {/* Notifications */}
-          <motion.button
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors relative"
-            whileHover={{ scale: 1.05 }}
-          >
-            <Bell className="w-5 h-5 text-muted-foreground" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </motion.button>
-
           {/* My Projects */}
           <Link href="/my-projects">
-            <motion.button
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <FolderKanban className="w-4 h-4" />
-              <span className="hidden sm:inline">My Projects</span>
-            </motion.button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors border border-transparent">
+              <FolderKanban className="w-4 h-4 text-slate-500" />
+              <span className="hidden sm:inline">Projects</span>
+            </button>
           </Link>
 
           {/* My Tasks */}
           <Link href="/my-tasks">
-            <motion.button
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <ListChecks className="w-4 h-4" />
-              <span className="hidden sm:inline">My Tasks</span>
-            </motion.button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors border border-transparent">
+              <ListChecks className="w-4 h-4 text-slate-500" />
+              <span className="hidden sm:inline">Tasks</span>
+            </button>
           </Link>
 
           {/* Copilot Toggle */}
-          <motion.button
+          <button
             onClick={() => setAiPanelOpen(!aiPanelOpen)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               aiPanelOpen
-                ? 'bg-primary/20 text-primary border border-primary/50'
-                : 'text-muted-foreground hover:bg-white/5 border border-transparent'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent'
             }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
-            <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">Copilot</span>
-          </motion.button>
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span className="hidden sm:inline">AI Copilot</span>
+          </button>
 
           {/* User Section */}
-          {/* User Section */}
           {!isLoaded ? (
-            <div className="w-10 h-10 rounded-xl bg-white/5 animate-pulse" />
+            <div className="w-8 h-8 rounded-lg bg-slate-100 animate-pulse" />
           ) : isSignedIn && user ? (
-            <motion.button
+            <button
               onClick={() => setAccountPanelOpen(!accountPanelOpen)}
-              className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all flex items-center justify-center bg-card"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 transition-all flex items-center justify-center bg-slate-50 shadow-sm"
             >
-              <img 
-                src={user.imageUrl} 
-                alt={user.fullName} 
+              <img
+                src={user.imageUrl}
+                alt={user.fullName}
                 className="w-full h-full object-cover"
               />
-            </motion.button>
+            </button>
           ) : (
-            <motion.button
+            <button
               onClick={() => void openSignIn()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-black text-xs font-semibold rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all cursor-pointer"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" /> Sign In
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
-    </motion.nav>
+    </nav>
   )
 }

@@ -6,15 +6,15 @@ import { Reveal, RevealStagger, RevealItem } from './reveal'
 import { MigrationModal } from './migration-modal'
 
 const TILES = [
-  { icon: FileText, title: 'Paste a spec / PRD', body: 'A PRD, meeting notes, or a ticket list — the AI edge that turns prose into a plan.' },
-  { icon: Upload, title: 'Upload CSV / Jira export', body: 'Drop a Jira or Linear export. We cluster tickets into epics, milestones and sprints.' },
-  { icon: GitBranch, title: 'Connect a repo', body: 'Point us at a GitHub repo and we ground scope and estimates in what already exists.' },
+  { icon: FileText, title: 'Paste a Spec / PRD', body: 'Paste existing PRD text, tickets, or meeting notes to convert prose into structured specs.' },
+  { icon: Upload, title: 'Import Jira / Linear CSV', body: 'Drop ticket exports. We automatically cluster tasks into epics, milestones, and sprints.' },
+  { icon: GitBranch, title: 'Connect a GitHub Repo', body: 'Point us at an existing codebase to ground architecture and scope in existing services.' },
 ]
 
 const REASSURE = [
-  { icon: Eye, text: 'See your reconstructed plan before you commit' },
-  { icon: RefreshCw, text: 'Keep your old tool in sync while you transition' },
-  { icon: Lock, text: 'Export back to CSV / JSON anytime — no lock-in' },
+  { icon: Eye, text: 'Review full reconstructed plan before committing' },
+  { icon: RefreshCw, text: 'Two-way export to your existing issue tracker' },
+  { icon: Lock, text: 'Zero vendor lock-in with Markdown & JSON exports' },
 ]
 
 export function MigrationSection() {
@@ -23,15 +23,16 @@ export function MigrationSection() {
   return (
     <section id="migrate" className="relative px-4 py-20 sm:py-28 scroll-mt-20">
       <div className="max-w-5xl mx-auto">
-        <div className="surface-card overflow-hidden p-8 sm:p-12 bg-gradient-to-b from-violet-500/[0.06] to-transparent">
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 shadow-sm">
           <Reveal className="max-w-2xl">
-            <span className="eyebrow"><RefreshCw className="w-3.5 h-3.5" /> Already mid-project?</span>
-            <h2 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-balance">
-              Bring your existing project into Devflow in <span className="text-gradient-warm">2 minutes.</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
+              <RefreshCw className="w-3.5 h-3.5" /> Existing Project Migration
+            </span>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+              Migrate existing codebases into Devflow in <span className="text-gradient">2 minutes.</span>
             </h2>
-            <p className="mt-4 text-muted-foreground text-lg">
-              Paste a spec, drop a Jira/Linear CSV, or connect your repo. Devflow reconstructs your full
-              plan and shows it side-by-side with what you already have. Nothing gets lost, nothing gets locked in.
+            <p className="mt-4 text-slate-600 text-sm sm:text-base leading-relaxed">
+              Paste an existing PRD, import a CSV export, or link your repository. Devflow reconstructs full architecture diagrams, sprint backlogs, and risk registers.
             </p>
           </Reveal>
 
@@ -40,32 +41,32 @@ export function MigrationSection() {
               <RevealItem key={t.title}>
                 <button
                   onClick={() => setOpen(true)}
-                  className="surface-card surface-card-hover text-left p-5 h-full w-full group"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left h-full w-full hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer group"
                 >
-                  <span className="grid place-items-center w-11 h-11 rounded-xl border border-white/10 bg-white/[0.04]">
-                    <t.icon className="w-5 h-5 text-primary" />
+                  <span className="grid place-items-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-blue-600 shadow-2xs">
+                    <t.icon className="w-5 h-5" />
                   </span>
-                  <h3 className="mt-3 font-semibold text-foreground flex items-center gap-1.5">
+                  <h3 className="mt-3 font-bold text-xs sm:text-sm text-slate-900 flex items-center justify-between">
                     {t.title}
-                    <ArrowRight className="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
                   </h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground">{t.body}</p>
+                  <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">{t.body}</p>
                 </button>
               </RevealItem>
             ))}
           </RevealStagger>
 
-          <Reveal delay={0.1} className="mt-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <Reveal delay={0.1} className="mt-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between pt-6 border-t border-slate-100">
             <button
               onClick={() => setOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_24px_-4px_var(--primary)] transition-shadow"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-3 text-xs sm:text-sm font-semibold text-white shadow-sm transition-all cursor-pointer"
             >
-              Reconstruct my project <ArrowRight className="w-4 h-4" />
+              Reconstruct Existing Project <ArrowRight className="w-4 h-4" />
             </button>
             <div className="flex flex-col gap-1.5">
               {REASSURE.map((r) => (
-                <span key={r.text} className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                  <r.icon className="w-3.5 h-3.5 text-primary" /> {r.text}
+                <span key={r.text} className="inline-flex items-center gap-2 text-xs text-slate-500">
+                  <r.icon className="w-3.5 h-3.5 text-blue-600" /> {r.text}
                 </span>
               ))}
             </div>

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Sparkles, ArrowRight, Check } from 'lucide-react'
 import { HeroPreview } from './hero-preview'
 
-const TRUST = ['Free to start', 'No credit card', 'First plan in ~2 min']
+const TRUST = ['Free to start', 'No credit card required', 'Full SDLC specification in ~2 min']
 
 export function HeroSection() {
   const focusInput = () => {
@@ -14,85 +14,80 @@ export function HeroSection() {
   const seePlan = () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })
 
   return (
-    <section className="relative px-4 pt-28 sm:pt-32 pb-10">
+    <section className="relative px-4 pt-28 sm:pt-32 pb-12">
       <div className="max-w-5xl mx-auto text-center">
         <motion.div
           className="flex justify-center"
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
         >
-          <span className="eyebrow">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
             <Sparkles className="w-3.5 h-3.5" />
-            Plans your next build in minutes, not sprints
+            Autonomous AI Multi-Agent SDLC Architecture
           </span>
         </motion.div>
 
         <motion.h1
-          className="mt-6 text-balance text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight"
+          className="mt-6 text-balance text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight text-slate-900"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.08 }}
+          transition={{ duration: 0.6, delay: 0.08 }}
         >
           Ship the plan before you
           <br className="hidden sm:block" /> write the <span className="text-gradient">first line of code.</span>
         </motion.h1>
 
         <motion.p
-          className="mt-6 mx-auto max-w-2xl text-lg sm:text-xl text-muted-foreground leading-relaxed"
+          className="mt-6 mx-auto max-w-2xl text-base sm:text-lg text-slate-600 leading-relaxed"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.16 }}
+          transition={{ duration: 0.6, delay: 0.16 }}
         >
-          Devflow is an AI organization — PM, architect, estimation and risk agents — that turns
-          one idea into a complete delivery plan: requirements, backlog, milestones, team, cost and risks.
+          Devflow is an autonomous AI engineering organization — PM, system architect, sprint planner, risk analyst, and DevOps agents — that converts raw product ideas into production delivery specifications.
         </motion.p>
 
         <motion.div
           className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.24 }}
+          transition={{ duration: 0.6, delay: 0.24 }}
         >
-          <motion.button
+          <button
             onClick={focusInput}
-            className="group inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-base font-semibold text-primary-foreground shadow-[0_0_30px_-6px_var(--primary)] hover:shadow-[0_0_44px_-4px_var(--primary)] transition-shadow"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all cursor-pointer"
           >
-            Plan my project
-            <ArrowRight className="w-4.5 h-4.5 transition-transform group-hover:translate-x-0.5" />
-          </motion.button>
-          <motion.button
+            Start Planning Free
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
             onClick={seePlan}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 text-base font-medium text-foreground hover:bg-white/10 hover:border-white/25 transition-colors"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-6 py-3 text-sm font-semibold text-slate-700 transition-colors shadow-xs cursor-pointer"
           >
-            See a live plan
-          </motion.button>
+            Explore Interactive Demo
+          </button>
         </motion.div>
 
         <motion.div
-          className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground"
+          className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.7, delay: 0.36 }}
+          transition={{ duration: 0.6, delay: 0.32 }}
         >
           {TRUST.map((t) => (
             <span key={t} className="inline-flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-primary" /> {t}
+              <Check className="w-3.5 h-3.5 text-blue-600" /> {t}
             </span>
           ))}
         </motion.div>
       </div>
 
-      {/* Animated product preview */}
+      {/* Product preview card */}
       <motion.div
-        className="mt-14 sm:mt-16"
-        initial={{ opacity: 0, y: 40, scale: 0.97 }}
+        className="mt-12 sm:mt-14"
+        initial={{ opacity: 0, y: 30, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.8, delay: 0.38 }}
       >
         <HeroPreview />
       </motion.div>

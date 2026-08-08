@@ -1,40 +1,37 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { CheckCircle2, AlertCircle, BookOpen } from 'lucide-react'
+import { CheckCircle2, AlertCircle, BookOpen, Layers } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
 import type { RequirementItem } from '@/lib/project-types'
 
 const priorityClass: Record<string, string> = {
-  high: 'bg-red-500/20 text-red-400',
-  medium: 'bg-yellow-500/20 text-yellow-400',
-  low: 'bg-green-500/20 text-green-400',
+  high: 'bg-rose-50 text-rose-700 border-rose-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-200',
+  low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
-function RequirementRow({ req, idx }: { req: RequirementItem; idx: number }) {
+function RequirementRow({ req }: { req: RequirementItem; idx: number }) {
   return (
-    <motion.div
-      className="p-4 bg-card/50 border border-white/10 rounded-lg hover:border-primary/50 transition-all"
-      whileHover={{ x: 4 }}
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: idx * 0.04 }}
-    >
-      <div className="flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+    <div className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground">{req.title}</p>
-          {req.description && <p className="text-xs text-muted-foreground mt-1">{req.description}</p>}
-          <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] uppercase tracking-wide bg-white/5 text-muted-foreground">
-            {req.category}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-xs text-slate-900">{req.title}</span>
+            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-white border border-slate-200 text-slate-500">
+              {req.category}
+            </span>
+          </div>
+          {req.description && (
+            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{req.description}</p>
+          )}
         </div>
-        <div className={`px-2 py-1 rounded text-xs font-semibold ${priorityClass[req.priority] || priorityClass.medium}`}>
-          {req.priority}
+        <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${priorityClass[req.priority] || priorityClass.medium}`}>
+          {req.priority.toUpperCase()}
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -43,18 +40,24 @@ export function RequirementsView() {
   const reqs = project?.requirements || null
 
   return (
-    <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+    <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Requirements</h2>
-        <p className="text-muted-foreground mt-1">Functional & non-functional requirements with user stories</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Product Requirements (PRD)</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Functional and non-functional specifications compiled by the Product Manager Agent
+        </p>
       </div>
 
       {!reqs ? (
         <GeneratingPanel label="Requirements" />
       ) : (
         <>
-          <div className="glass-panel p-6 rounded-xl">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Functional Requirements</h3>
+          {/* Functional Reqs */}
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-blue-600" />
+              Functional Requirements
+            </h3>
             <div className="space-y-3">
               {reqs.functional_requirements.map((req, idx) => (
                 <RequirementRow key={`f-${idx}`} req={req} idx={idx} />
@@ -62,8 +65,12 @@ export function RequirementsView() {
             </div>
           </div>
 
-          <div className="glass-panel p-6 rounded-xl">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Non-Functional Requirements</h3>
+          {/* Non-Functional Reqs */}
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-indigo-600" />
+              Non-Functional Requirements & Constraints
+            </h3>
             <div className="space-y-3">
               {reqs.non_functional_requirements.map((req, idx) => (
                 <RequirementRow key={`n-${idx}`} req={req} idx={idx} />
@@ -71,53 +78,70 @@ export function RequirementsView() {
             </div>
           </div>
 
-          <div className="glass-panel p-6 rounded-xl">
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-primary" /> User Stories
+          {/* User Stories */}
+          <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-600" /> User Stories & Acceptance Criteria
             </h3>
             <div className="space-y-4">
               {reqs.user_stories.map((story, idx) => (
-                <motion.div key={idx} className="p-4 bg-card/50 border border-white/10 rounded-lg" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.04 }}>
-                  <p className="text-sm text-foreground">
-                    <span className="text-cyan-400">As a</span> {story.as_a},{' '}
-                    <span className="text-cyan-400">I want</span> {story.i_want},{' '}
-                    <span className="text-cyan-400">so that</span> {story.so_that}.
+                <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <p className="text-xs text-slate-900 leading-relaxed font-medium">
+                    <span className="text-blue-600 font-bold">As a</span> {story.as_a},{' '}
+                    <span className="text-blue-600 font-bold">I want</span> {story.i_want},{' '}
+                    <span className="text-blue-600 font-bold">so that</span> {story.so_that}.
                   </p>
                   {story.acceptance_criteria?.length > 0 && (
-                    <ul className="mt-3 space-y-1">
-                      {story.acceptance_criteria.map((c, i) => (
-                        <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-3 pt-3 border-t border-slate-200/80">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Acceptance Criteria
+                      </span>
+                      <ul className="space-y-1.5">
+                        {story.acceptance_criteria.map((c, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                            <span>{c}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
 
+          {/* Scope Boxes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="glass-panel p-6 rounded-xl">
-              <h3 className="text-sm font-semibold text-emerald-400 mb-3 uppercase tracking-wide">In Scope</h3>
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+              <h3 className="text-xs font-bold text-emerald-700 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> In Scope (MVP)
+              </h3>
               <ul className="space-y-2">
                 {reqs.scope_in.map((s, i) => (
-                  <li key={i} className="text-sm text-foreground/90 flex gap-2"><span className="text-emerald-400">+</span>{s}</li>
+                  <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
+                    <span className="text-emerald-600 font-bold">+</span>
+                    <span>{s}</span>
+                  </li>
                 ))}
               </ul>
             </div>
-            <div className="glass-panel p-6 rounded-xl">
-              <h3 className="text-sm font-semibold text-red-400 mb-3 uppercase tracking-wide">Out of Scope</h3>
+            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+              <h3 className="text-xs font-bold text-rose-700 mb-3 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500" /> Out of Scope (Future)
+              </h3>
               <ul className="space-y-2">
                 {reqs.scope_out.map((s, i) => (
-                  <li key={i} className="text-sm text-foreground/90 flex gap-2"><span className="text-red-400">−</span>{s}</li>
+                  <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
+                    <span className="text-rose-500 font-bold">−</span>
+                    <span>{s}</span>
+                  </li>
                 ))}
               </ul>
             </div>
           </div>
         </>
       )}
-    </motion.div>
+    </div>
   )
 }

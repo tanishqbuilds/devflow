@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#050816',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({
@@ -54,8 +54,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark bg-background">
-      <body className="font-sans antialiased bg-background text-foreground">
+    <html lang="en" className="bg-background text-foreground">
+      <body className="font-sans antialiased bg-background text-foreground min-h-screen">
         <ClerkProvider afterSignOutUrl="/">
           <AuthProvider>{children}</AuthProvider>
         </ClerkProvider>

@@ -4,103 +4,67 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Deep space dark background */
-  --background: #050816;
-  --foreground: #f0f0ff;
+  /* Light theme: Crisp, professional modern SaaS palette */
+  --background: #f8fafc;
+  --foreground: #0f172a;
   
   /* Card and surface colors */
-  --card: #0f1428;
-  --card-foreground: #f0f0ff;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
   
   /* Popover */
-  --popover: #0f1428;
-  --popover-foreground: #f0f0ff;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
   
-  /* Primary - Electric blue */
-  --primary: #00d9ff;
-  --primary-foreground: #050816;
+  /* Primary - High-contrast Royal Indigo / Deep Slate */
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
   
-  /* Secondary - Purple glow */
-  --secondary: #7c3aed;
-  --secondary-foreground: #f0f0ff;
+  /* Secondary - Soft slate button & hover surface */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
   
-  /* Muted */
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
+  /* Muted elements and text */
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
   
-  /* Accent - Cyan */
-  --accent: #06b6d4;
-  --accent-foreground: #050816;
+  /* Accent - Ice Blue */
+  --accent: #eff6ff;
+  --accent-foreground: #1d4ed8;
   
   /* Destructive */
   --destructive: #ef4444;
-  --destructive-foreground: #f0f0ff;
+  --destructive-foreground: #ffffff;
   
   /* Borders and inputs */
-  --border: #1e293b;
-  --input: #0f1428;
-  --ring: #00d9ff;
+  --border: #e2e8f0;
+  --input: #ffffff;
+  --ring: #3b82f6;
   
-  /* Chart colors - vibrant for dark background */
-  --chart-1: #00d9ff;
-  --chart-2: #7c3aed;
-  --chart-3: #06b6d4;
-  --chart-4: #a78bfa;
-  --chart-5: #38bdf8;
+  /* Chart colors - clear, accessible professional palette */
+  --chart-1: #2563eb;
+  --chart-2: #059669;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #0284c7;
   
   /* Radius */
   --radius: 0.625rem;
   
   /* Sidebar */
-  --sidebar: #0f1428;
-  --sidebar-foreground: #f0f0ff;
-  --sidebar-primary: #00d9ff;
-  --sidebar-primary-foreground: #050816;
-  --sidebar-accent: #7c3aed;
-  --sidebar-accent-foreground: #f0f0ff;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #00d9ff;
-}
-
-.dark {
-  /* Dark theme is default, maintain same values */
-  --background: #050816;
-  --foreground: #f0f0ff;
-  --card: #0f1428;
-  --card-foreground: #f0f0ff;
-  --popover: #0f1428;
-  --popover-foreground: #f0f0ff;
-  --primary: #00d9ff;
-  --primary-foreground: #050816;
-  --secondary: #7c3aed;
-  --secondary-foreground: #f0f0ff;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #06b6d4;
-  --accent-foreground: #050816;
-  --destructive: #ef4444;
-  --destructive-foreground: #f0f0ff;
-  --border: #1e293b;
-  --input: #0f1428;
-  --ring: #00d9ff;
-  --chart-1: #00d9ff;
-  --chart-2: #7c3aed;
-  --chart-3: #06b6d4;
-  --chart-4: #a78bfa;
-  --chart-5: #38bdf8;
-  --sidebar: #0f1428;
-  --sidebar-foreground: #f0f0ff;
-  --sidebar-primary: #00d9ff;
-  --sidebar-primary-foreground: #050816;
-  --sidebar-accent: #7c3aed;
-  --sidebar-accent-foreground: #f0f0ff;
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #00d9ff;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f8fafc;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #3b82f6;
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -144,125 +108,92 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply bg-background;
+    @apply bg-background text-foreground antialiased;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
 
-/* Glassmorphism and glow effects */
+/* ============================================================= */
+/*  Clean Professional SaaS Surfaces & Components                */
+/* ============================================================= */
 @layer components {
+  /* Crisp, clean light card surface */
   .glass-panel {
-    @apply bg-background/40 backdrop-blur-xl border border-white/10;
+    @apply bg-white border border-slate-200/90 shadow-sm rounded-xl;
   }
   
   .glass-panel-dark {
-    @apply bg-card/50 backdrop-blur-xl border border-white/5;
+    @apply bg-slate-900 text-white border border-slate-800 shadow-md rounded-xl;
   }
   
+  .surface-card {
+    @apply bg-white border border-slate-200/90 shadow-sm rounded-xl transition-all duration-200;
+  }
+  
+  .surface-card-hover {
+    @apply hover:border-slate-300 hover:shadow-md;
+  }
+
   .glow-border {
-    @apply border border-primary/30 shadow-lg shadow-primary/20;
+    @apply border border-blue-500/30 shadow-sm;
   }
   
   .glow-border-accent {
-    @apply border border-accent/30 shadow-lg shadow-accent/20;
+    @apply border border-slate-300 shadow-sm;
   }
   
   .glow-text {
-    @apply text-primary drop-shadow-lg drop-shadow-primary/50;
-  }
-}
-
-/* Custom animations */
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-@keyframes ambient-glow {
-  0% {
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3), 0 0 40px rgba(124, 58, 237, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(0, 217, 255, 0.5), 0 0 60px rgba(124, 58, 237, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3), 0 0 40px rgba(124, 58, 237, 0.2);
-  }
-}
-
-@layer utilities {
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+    @apply text-blue-600 font-semibold;
   }
 
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  /* Refined eyebrow badge */
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold tracking-wide text-blue-700;
   }
 
-  .animate-ambient-glow {
-    animation: ambient-glow 4s ease-in-out infinite;
+  /* Status Chips */
+  .status-badge-complete {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  
+  .status-badge-active {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  
+  .status-badge-idle {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200;
   }
 }
 
 /* ============================================================= */
-/*  Landing / marketing visual system                            */
+/*  Utilities & Clean Marketing Patterns                         */
 /* ============================================================= */
 @layer utilities {
-  /* Brand gradient text */
+  /* Refined, high-contrast gradient text */
   .text-gradient {
-    @apply bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-slate-900 via-blue-700 to-indigo-700 bg-clip-text text-transparent;
   }
+  
   .text-gradient-warm {
-    @apply bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-300 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 bg-clip-text text-transparent;
   }
 
-  /* Subtle blueprint grid backdrop */
+  /* Clean subtle technical grid backdrop */
   .bg-grid {
     background-image:
-      linear-gradient(to right, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
-    background-size: 56px 56px;
+      linear-gradient(to right, rgba(203, 213, 225, 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(203, 213, 225, 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
+
   .bg-grid-fade {
-    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 60%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 60%, transparent 100%);
   }
 
-  /* Animated gradient border card */
-  .animate-aurora {
-    animation: aurora 18s ease-in-out infinite;
-  }
-  .animate-marquee {
-    animation: marquee 32s linear infinite;
-  }
-  .animate-shimmer {
-    background-size: 200% 100%;
-    animation: shimmer 2.2s linear infinite;
-  }
-  .animate-gradient-pan {
-    background-size: 200% 200%;
-    animation: gradient-pan 6s ease infinite;
-  }
-  .animate-spin-slow {
-    animation: spin 14s linear infinite;
-  }
-
-  /* Hide scrollbars (used by chat + carousels) */
+  /* Hide scrollbars (used by clean tabs + carousels) */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -270,37 +201,4 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-}
-
-@layer components {
-  /* A frosted card with a faint gradient ring — the landing's primary surface */
-  .surface-card {
-    @apply relative rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl;
-  }
-  .surface-card-hover {
-    @apply transition-all duration-300 hover:border-primary/40 hover:bg-card/60 hover:shadow-[0_0_40px_-12px_rgba(0,217,255,0.35)];
-  }
-  /* Eyebrow pill above section headings */
-  .eyebrow {
-    @apply inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium tracking-wide text-primary;
-  }
-}
-
-@keyframes aurora {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(6%, -8%) scale(1.12); }
-  66% { transform: translate(-5%, 6%) scale(0.94); }
-}
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@keyframes shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
-}
-@keyframes gradient-pan {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }

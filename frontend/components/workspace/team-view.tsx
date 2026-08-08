@@ -11,10 +11,10 @@ export function TeamView() {
 
   if (!team) {
     return (
-      <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h2 className="text-3xl font-bold text-foreground">Team Planning</h2>
-        <GeneratingPanel label="Team plan" />
-      </motion.div>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Engineering Team Allocation</h2>
+        <GeneratingPanel label="Team Composition & Roles" />
+      </div>
     )
   }
 
@@ -25,82 +25,96 @@ export function TeamView() {
     : 0
 
   return (
-    <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+    <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-foreground mb-2">Team Planning</h2>
-        <p className="text-muted-foreground">Resource allocation and team composition</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Engineering Team Structure</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Role staffing and ownership modeled by the VP of Engineering Agent
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Snapshot Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Total Team Size', value: totalMembers, icon: Users },
-          { label: 'Avg Allocation', value: `${avgAllocation}%`, icon: Zap },
-          { label: 'Roles', value: members.length, icon: Briefcase },
-        ].map((item, idx) => (
-          <motion.div key={item.label} className="glass-panel p-6 rounded-xl" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
-            <div className="flex items-center gap-3 mb-2">
-              <item.icon className="w-5 h-5 text-primary" />
-              <p className="text-sm text-muted-foreground">{item.label}</p>
+          { label: 'Recommended Team Size', value: `${totalMembers} FTEs`, icon: Users, color: 'text-blue-600' },
+          { label: 'Average Allocation', value: `${avgAllocation}%`, icon: Zap, color: 'text-indigo-600' },
+          { label: 'Distinct Roles', value: `${members.length} Specializations`, icon: Briefcase, color: 'text-emerald-600' },
+        ].map((item) => (
+          <div key={item.label} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <item.icon className={`w-4 h-4 ${item.color}`} />
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{item.label}</p>
             </div>
-            <p className="text-3xl font-bold text-foreground">{item.value}</p>
-          </motion.div>
+            <p className="text-2xl font-bold text-slate-900">{item.value}</p>
+          </div>
         ))}
       </div>
 
+      {/* Roles List */}
       <div className="space-y-4">
         {members.map((role, idx) => (
-          <motion.div key={idx} className="glass-panel p-6 rounded-lg" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}>
+          <div key={idx} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {role.role} <span className="text-sm text-muted-foreground">· {role.seniority}</span>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  {role.role}
+                  <span className="text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
+                    {role.seniority}
+                  </span>
                 </h3>
                 {role.responsibilities?.length > 0 && (
-                  <p className="text-sm text-muted-foreground mt-1">{role.responsibilities.join(' · ')}</p>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{role.responsibilities.join(' · ')}</p>
                 )}
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-primary">{role.count}</p>
-                <p className="text-xs text-muted-foreground">{role.count === 1 ? 'person' : 'people'}</p>
+              <div className="text-right bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2">
+                <p className="text-xl font-bold text-slate-900">{role.count}</p>
+                <p className="text-[10px] uppercase font-bold text-slate-400">{role.count === 1 ? 'person' : 'people'}</p>
               </div>
             </div>
 
             <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Allocation</p>
-                <span className="text-sm font-semibold text-foreground">{role.allocation_pct}%</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold text-slate-500">Dedicated Allocation</p>
+                <span className="text-xs font-bold text-slate-900">{role.allocation_pct}%</span>
               </div>
-              <div className="h-2 bg-card rounded-full overflow-hidden">
-                <motion.div
-                  className={`h-full ${role.allocation_pct > 85 ? 'bg-red-500' : role.allocation_pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                  initial={{ width: 0 }} animate={{ width: `${role.allocation_pct}%` }} transition={{ duration: 0.8 }} />
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div
+                  className="h-full bg-blue-600 rounded-full"
+                  style={{ width: `${role.allocation_pct}%` }}
+                />
               </div>
             </div>
 
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Key Skills</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Required Core Skills</p>
+              <div className="flex flex-wrap gap-1.5">
                 {(role.skills || []).map((skill) => (
-                  <span key={skill} className="px-3 py-1 bg-primary/20 text-primary rounded-full text-xs font-medium">{skill}</span>
+                  <span key={skill} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-semibold">
+                    {skill}
+                  </span>
                 ))}
               </div>
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
 
+      {/* Ownership & Accountability */}
       {team.ownership?.length > 0 && (
-        <div className="glass-panel p-6 rounded-xl">
-          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" /> Ownership
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" /> Ownership & Accountability Matrices
           </h3>
           <ul className="space-y-2">
             {team.ownership.map((o, i) => (
-              <li key={i} className="text-sm text-foreground/90 flex gap-2"><span className="text-emerald-400">•</span>{o}</li>
+              <li key={i} className="text-xs text-slate-700 flex gap-2.5 items-start">
+                <span className="text-emerald-600 font-bold">•</span>
+                <span>{o}</span>
+              </li>
             ))}
           </ul>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

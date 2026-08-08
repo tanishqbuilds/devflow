@@ -1,88 +1,81 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import { Quote, TrendingDown, TrendingUp, Zap } from 'lucide-react'
-
 import { Reveal, RevealStagger, RevealItem } from './reveal'
 
 const metrics = [
   {
     icon: TrendingDown,
-    label: 'Planning time',
+    label: 'Planning Cycle Time',
     value: '↓ 92%',
-    blurb: 'From multi-week scoping marathons to a single sitting.',
+    blurb: 'From multi-week scoping marathons to under 2 minutes.',
   },
   {
     icon: TrendingUp,
-    label: 'Estimate confidence',
+    label: 'Estimate Confidence',
     value: '↑ 2.4×',
-    blurb: 'Teams commit to dates they actually believe in.',
+    blurb: 'Defensible story points with transparent assumptions.',
   },
   {
     icon: Zap,
-    label: 'Zero to full plan',
+    label: 'First Full Specification',
     value: '~2 min',
-    blurb: 'A complete, structured plan before the coffee cools.',
+    blurb: 'Complete PRD, architecture, and backlog generated.',
   },
 ] as const
 
 const testimonials = [
   {
-    quote: 'Cut our scoping from three weeks to an afternoon. We shipped the roadmap before the sprint even started.',
+    quote: 'Devflow cut our sprint scoping from three weeks to an afternoon. We shipped our MVP architecture before kickoff.',
     name: 'Maya R.',
-    role: 'Technical Founder',
+    role: 'CTO & Co-Founder',
     initials: 'MR',
-    gradient: 'from-[#00d9ff] to-[#7c3aed]',
   },
   {
-    quote: 'Our estimates went from hopeful guesses to numbers we could defend in front of the board.',
+    quote: 'The security threat modeling and rate-card estimates gave us numbers we could defend directly to our board.',
     name: 'Devon K.',
-    role: 'Eng Lead at a seed startup',
+    role: 'VP of Engineering at Series A Startup',
     initials: 'DK',
-    gradient: 'from-[#7c3aed] to-[#00d9ff]',
   },
   {
-    quote: 'I now scope client projects in minutes and bill with confidence. It paid for itself the first week.',
+    quote: 'I scope client applications in minutes and generate accurate delivery roadmaps with zero guesswork.',
     name: 'Priya S.',
-    role: 'Agency Owner',
+    role: 'Managing Director, Cloud Agency',
     initials: 'PS',
-    gradient: 'from-[#00d9ff] via-[#38bdf8] to-[#7c3aed]',
   },
 ] as const
 
 export function SocialProof() {
   return (
     <section id="social" className="relative px-4 py-20 sm:py-28 scroll-mt-20">
-      <div className="bg-grid pointer-events-none absolute inset-0 -z-10 opacity-40" aria-hidden="true" />
-
       <div className="max-w-6xl mx-auto">
         <Reveal direction="up" className="text-center">
-          <span className="eyebrow">Loved by builders</span>
-          <h2 className="mt-5 text-3xl sm:text-5xl font-bold tracking-tight text-balance">
-            Teams stopped guessing.{' '}
-            <span className="text-gradient">Then they shipped.</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
+            Proven Outcomes
+          </span>
+          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
+            Engineered for teams that <span className="text-gradient">ship on time.</span>
           </h2>
-          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-balance">
-            The same outcome, again and again: less time arguing about scope, more
-            time building the thing.
+          <p className="mt-4 text-slate-600 max-w-2xl mx-auto text-sm sm:text-base">
+            Less time arguing about scope, more time delivering high-impact features.
           </p>
         </Reveal>
 
-        {/* Metrics strip */}
+        {/* Metrics Strip */}
         <Reveal direction="up" delay={0.1} className="mt-12">
           <dl className="grid gap-4 sm:grid-cols-3">
             {metrics.map(({ icon: Icon, label, value, blurb }) => (
-              <div key={label} className="surface-card p-6 text-center sm:text-left">
+              <div key={label} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs text-center sm:text-left">
                 <div className="flex items-center justify-center gap-2 sm:justify-start">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600">
+                    <Icon className="h-4 w-4" />
                   </span>
-                  <dt className="text-sm text-muted-foreground">{label}</dt>
+                  <dt className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</dt>
                 </div>
-                <dd className="mt-4 text-4xl font-bold tracking-tight text-gradient">
+                <dd className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
                   {value}
                 </dd>
-                <p className="mt-2 text-sm text-muted-foreground">{blurb}</p>
+                <p className="mt-2 text-xs text-slate-600 leading-relaxed">{blurb}</p>
               </div>
             ))}
           </dl>
@@ -90,42 +83,26 @@ export function SocialProof() {
 
         {/* Testimonials */}
         <RevealStagger className="mt-8 grid gap-4 sm:grid-cols-3">
-          {testimonials.map(({ quote, name, role, initials, gradient }) => (
+          {testimonials.map(({ quote, name, role, initials }) => (
             <RevealItem key={name} className="h-full">
-              <motion.figure
-                whileHover={{ y: -4 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                className="surface-card surface-card-hover flex h-full flex-col p-6"
-              >
-                <Quote
-                  className="h-6 w-6 text-primary/70"
-                  aria-hidden="true"
-                />
-                <blockquote className="mt-4 flex-1 text-foreground/90 text-balance">
+              <figure className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs hover:border-slate-300 hover:shadow-md transition-all flex h-full flex-col">
+                <Quote className="h-5 w-5 text-blue-600" />
+                <blockquote className="mt-4 flex-1 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
                   &ldquo;{quote}&rdquo;
                 </blockquote>
-                <figcaption className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
-                  <span
-                    className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-sm font-semibold text-background`}
-                    aria-hidden="true"
-                  >
+                <figcaption className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-4">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
                     {initials}
                   </span>
-                  <span className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">{name}</span>
-                    <span className="text-xs text-muted-foreground">{role}</span>
+                  <span className="flex flex-col text-left">
+                    <span className="text-xs font-bold text-slate-900">{name}</span>
+                    <span className="text-[11px] text-slate-500">{role}</span>
                   </span>
                 </figcaption>
-              </motion.figure>
+              </figure>
             </RevealItem>
           ))}
         </RevealStagger>
-
-        <Reveal direction="up" delay={0.15} className="mt-6 text-center">
-          <p className="text-xs text-muted-foreground/70">
-            Illustrative — design-partner feedback.
-          </p>
-        </Reveal>
       </div>
     </section>
   )

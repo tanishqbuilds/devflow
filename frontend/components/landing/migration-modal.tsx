@@ -3,14 +3,14 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { X, FileText, Upload, GitBranch, ArrowRight, Loader2, ShieldCheck } from 'lucide-react'
+import { X, FileText, Upload, GitBranch, ArrowRight, Loader2 } from 'lucide-react'
 import { migrateProject, type MigrationSource } from '@/lib/api'
 import { useAppAuth, useAppUser } from '@/lib/auth-context'
 
 const TABS: { id: MigrationSource; label: string; icon: any }[] = [
-  { id: 'spec', label: 'Paste spec / tickets', icon: FileText },
-  { id: 'file', label: 'Upload file', icon: Upload },
-  { id: 'repo', label: 'Connect repo', icon: GitBranch },
+  { id: 'spec', label: 'Paste Spec / Tickets', icon: FileText },
+  { id: 'file', label: 'Upload CSV', icon: Upload },
+  { id: 'repo', label: 'Connect Repo', icon: GitBranch },
 ]
 
 export function MigrationModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -60,9 +60,10 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
     setError(null)
     try {
       const { project_id } = await migrateProject({ source: tab, content })
+      onClose()
       router.push(`/workspace?project=${project_id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Migration failed. Is the backend running?')
+      setError(err instanceof Error ? err.message : 'Migration failed.')
       setSubmitting(false)
     }
   }
@@ -70,107 +71,121 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[100] grid place-items-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="migration-dialog-title"
-            className="relative w-full max-w-xl surface-card p-6 shadow-2xl"
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className="relative z-10 w-full max-w-xl rounded-2xl bg-white border border-slate-200 p-6 sm:p-7 shadow-2xl"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
           >
-            <button aria-label="Close migration dialog" onClick={onClose} className="absolute right-4 top-4 p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground">
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 id="migration-dialog-title" className="text-xl font-bold">Bring your existing project into Devflow</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              We reconstruct your full plan — milestones, backlog, risks and cost — from what you already have.
-            </p>
-
-            {/* tabs */}
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                    tab === t.id
-                      ? 'border-primary/50 bg-primary/10 text-primary'
-                      : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <t.icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t.label}</span>
-                </button>
-              ))}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Reconstruct Existing Project</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Import PRD specs, tickets, or repos to build a structured delivery plan.
+                </p>
+              </div>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="mt-4">
-              {tab === 'spec' && (
+            {/* Tabs */}
+            <div className="mt-5 grid grid-cols-3 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              {TABS.map((t) => {
+                const Icon = t.icon
+                const active = tab === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTab(t.id)
+                      setError(null)
+                    }}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      active ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Inputs */}
+            <div className="mt-4 space-y-3">
+              {tab === 'repo' && (
+                <input
+                  type="text"
+                  value={repo}
+                  onChange={(e) => setRepo(e.target.value)}
+                  placeholder="https://github.com/org/repo"
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+
+              {tab === 'file' && (
+                <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center hover:border-blue-400 cursor-pointer">
+                  <Upload className="w-6 h-6 text-blue-600 mb-2" />
+                  <span className="text-xs font-semibold text-slate-900">
+                    {fileName || 'Drop CSV, Markdown, or JSON export here'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">Up to 2 MB</span>
+                  <input type="file" accept=".csv,.json,.md,.txt" onChange={onFile} className="hidden" />
+                </label>
+              )}
+
+              {(tab === 'spec' || tab === 'repo' || fileName) && (
                 <textarea
                   value={spec}
                   onChange={(e) => setSpec(e.target.value)}
                   rows={6}
-                  placeholder="Paste a PRD, a spec, meeting notes, or a list of existing tickets / epics…"
-                  className="w-full resize-none rounded-xl border border-white/12 bg-background/60 px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
+                  placeholder="Paste existing PRD, user stories, or architecture notes here…"
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
-              {tab === 'file' && (
-                <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-8 cursor-pointer hover:border-primary/40">
-                  <Upload className="w-6 h-6 text-primary" />
-                  <span className="text-sm text-foreground">{fileName ?? 'Click to upload a CSV, .md, .txt or export'}</span>
-                  <span className="text-xs text-muted-foreground">{fileName ? `${spec.length} chars loaded` : 'Jira/Linear CSV, PRD, README…'}</span>
-                  <input type="file" accept=".csv,.md,.txt,.json,.tsv,text/*" className="hidden" onChange={onFile} />
-                </label>
-              )}
-              {tab === 'repo' && (
-                <div className="space-y-3">
-                  <input
-                    value={repo}
-                    onChange={(e) => setRepo(e.target.value)}
-                    placeholder="https://github.com/your-org/your-repo"
-                    className="w-full rounded-xl border border-white/12 bg-background/60 px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
-                  />
-                  <textarea
-                    value={spec}
-                    onChange={(e) => setSpec(e.target.value)}
-                    rows={3}
-                    placeholder="Optional: paste the README or a short description of the project…"
-                    className="w-full resize-none rounded-xl border border-white/12 bg-background/60 px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
-                  />
-                </div>
+
+              {error && (
+                <p className="text-xs font-medium text-rose-600" role="alert">
+                  {error}
+                </p>
               )}
             </div>
 
-            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-
-            <button
-              onClick={submit}
-              disabled={submitting}
-              className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60 hover:shadow-[0_0_24px_-4px_var(--primary)] transition-shadow"
-            >
-              {submitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Reconstructing your plan…</>
-              ) : (
-                <>Reconstruct my plan <ArrowRight className="w-4 h-4" /></>
-              )}
-            </button>
-
-            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-              <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-              See the plan before you commit · Export back to CSV/JSON anytime · No lock-in
+            {/* Actions */}
+            <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submit}
+                disabled={submitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reconstructing…
+                  </>
+                ) : (
+                  <>
+                    Reconstruct Plan <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   )

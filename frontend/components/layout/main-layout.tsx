@@ -21,11 +21,11 @@ export function MainLayout({ children }: MainLayoutProps) {
       <AccountPanel />
 
       <motion.main
-        className="pt-20 transition-all duration-300 h-[calc(100vh-80px)] overflow-y-auto"
-        animate={{ marginLeft: sidebarCollapsed ? '72px' : '240px' }}
-        transition={{ duration: 0.3 }}
+        className="pt-16 transition-all duration-200 h-[calc(100vh-64px)] overflow-y-auto bg-slate-50"
+        animate={{ marginLeft: sidebarCollapsed ? '70px' : '230px' }}
+        transition={{ duration: 0.2 }}
       >
-        <div className="p-6">
+        <div className="p-6 max-w-7xl mx-auto">
           {children}
         </div>
       </motion.main>

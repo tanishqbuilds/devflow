@@ -51,9 +51,9 @@ const groups: SidebarGroup[] = [
     label: 'Deliver',
     items: [
       { mode: 'milestones', label: 'Timeline', icon: <CalendarRange /> },
-      { mode: 'cost', label: 'Cost', icon: <DollarSign /> },
-      { mode: 'team', label: 'Team', icon: <Users /> },
-      { mode: 'integrations', label: 'Integrations', icon: <Plug /> },
+      { mode: 'cost', label: 'Cost & Budget', icon: <DollarSign /> },
+      { mode: 'team', label: 'Team Roles', icon: <Users /> },
+      { mode: 'integrations', label: 'DevOps & CI/CD', icon: <Plug /> },
     ],
   },
   {
@@ -69,61 +69,43 @@ export function Sidebar() {
   const { sidebarCollapsed, activeWorkspaceMode, setActiveWorkspaceMode } = useAppStore()
 
   return (
-    <motion.aside
-      className="fixed left-0 top-0 h-screen pt-20 bg-[#050816]/40 backdrop-blur-xl border-r border-white/5 z-30 flex flex-col justify-between"
-      animate={{ width: sidebarCollapsed ? '72px' : '240px' }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
+    <aside
+      className={`fixed left-0 top-0 h-screen pt-16 bg-white border-r border-slate-200 z-30 flex flex-col justify-between transition-all duration-200 ${
+        sidebarCollapsed ? 'w-[70px]' : 'w-[230px]'
+      }`}
     >
       <div className="flex-1 overflow-y-auto scrollbar-hide p-3 flex flex-col">
-        <nav className="space-y-3">
+        <nav className="space-y-3 mt-1">
           {groups.map((group) => (
             <div key={group.label}>
-              <AnimatePresence mode="wait">
-                {!sidebarCollapsed && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60"
-                  >
-                    {group.label}
-                  </motion.p>
-                )}
-              </AnimatePresence>
+              {!sidebarCollapsed && (
+                <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {group.label}
+                </p>
+              )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = activeWorkspaceMode === item.mode
                   return (
-                    <motion.button
+                    <button
                       key={item.mode}
                       onClick={() => setActiveWorkspaceMode(item.mode)}
                       title={item.label}
-                      className={`w-full px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2.5 text-left text-[13px] font-medium ${
+                      className={`w-full px-3 py-2 rounded-lg transition-all flex items-center gap-2.5 text-left text-xs font-medium ${
                         active
-                          ? 'bg-primary/10 text-primary border border-primary/30 shadow-[0_0_15px_rgba(0,217,255,0.15)]'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
+                          ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                       }`}
-                      whileHover={{ x: sidebarCollapsed ? 0 : 3 }}
                     >
                       <span className="flex-shrink-0">
                         {React.cloneElement(item.icon, {
-                          className: `w-4 h-4 transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`,
+                          className: `w-4 h-4 transition-colors ${active ? 'text-blue-600' : 'text-slate-500'}`,
                         })}
                       </span>
-                      <AnimatePresence mode="wait">
-                        {!sidebarCollapsed && (
-                          <motion.span
-                            initial={{ opacity: 0, width: 0 }}
-                            animate={{ opacity: 1, width: 'auto' }}
-                            exit={{ opacity: 0, width: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="whitespace-nowrap overflow-hidden"
-                          >
-                            {item.label}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </motion.button>
+                      {!sidebarCollapsed && (
+                        <span className="whitespace-nowrap overflow-hidden truncate">{item.label}</span>
+                      )}
+                    </button>
                   )
                 })}
               </div>
@@ -132,28 +114,16 @@ export function Sidebar() {
         </nav>
 
         <div className="mt-auto pt-2">
-          <div className="my-2 border-t border-white/5" />
+          <div className="my-2 border-t border-slate-200" />
           <button
-            className="w-full px-3 py-2 rounded-lg flex items-center gap-2.5 text-left text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="w-full px-3 py-2 rounded-lg flex items-center gap-2.5 text-left text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Settings"
           >
-            <Settings className="w-4 h-4 flex-shrink-0" />
-            <AnimatePresence mode="wait">
-              {!sidebarCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="whitespace-nowrap overflow-hidden"
-                >
-                  Settings
-                </motion.span>
-              )}
-            </AnimatePresence>
+            <Settings className="w-4 h-4 flex-shrink-0 text-slate-400" />
+            {!sidebarCollapsed && <span className="whitespace-nowrap">Settings</span>}
           </button>
         </div>
       </div>
-    </motion.aside>
+    </aside>
   )
 }

@@ -7,28 +7,24 @@ import { Reveal, RevealStagger, RevealItem } from './reveal'
 
 const FAQS: { q: string; a: string }[] = [
   {
-    q: 'Is an AI-made plan actually accurate?',
-    a: 'Every plan shows its assumptions and is fully editable — treat it as a senior first draft you refine, not gospel. The agents work in sequence so each builds on a reviewed foundation.',
+    q: 'How accurate is an autonomous AI-generated delivery plan?',
+    a: 'Every plan explicitly displays its architectural assumptions, story point benchmarks, and rate cards. The 8 agents cross-validate each other sequentially so that architecture informs the backlog, and the backlog directly derives the timeline and budget.',
   },
   {
-    q: 'Can I edit everything?',
-    a: 'Yes. Requirements, backlog, estimates, team, risks — all editable. You own the plan.',
+    q: 'Can I iterate and refine the plan as requirements evolve?',
+    a: 'Yes. With persistent PostgreSQL and Redis project memory, agents retain historical database context and seamlessly update specifications without losing previous decisions.',
   },
   {
-    q: 'Does it export to my tools?',
-    a: 'Export to Linear, Jira, Notion and Markdown. We feed the tools you already use.',
+    q: 'Can I export the delivery plan to Jira, Linear, or Markdown?',
+    a: 'Yes. Devflow natively exports user stories, epics, and acceptance criteria to Linear, Jira, Notion, and structured Markdown.',
   },
   {
-    q: 'What about my data and IP?',
-    a: "Your inputs are yours. We don't train on your data, and you can export and delete anytime.",
+    q: 'How is data privacy and intellectual property protected?',
+    a: 'Your inputs and architecture designs are private and never used for foundation model training. All database records are scoped per user workspace.',
   },
   {
-    q: 'How is it free?',
-    a: 'Devflow runs on fast, efficient open models (Groq), so the free tier is genuinely free — no trial trap.',
-  },
-  {
-    q: "What if I'm already mid-project?",
-    a: 'Use migration: paste a spec or drop a Jira/Linear export and we reconstruct your full plan in minutes.',
+    q: 'Which LLM models power Devflow?',
+    a: 'Devflow is natively configured with Groq LLaMA 3.3 70B Versatile for high-speed deterministic structured generation and LangGraph orchestration.',
   },
 ]
 
@@ -37,68 +33,48 @@ export function FaqSection() {
 
   return (
     <section id="faq" className="relative px-4 py-20 sm:py-28 scroll-mt-20">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <Reveal direction="up" className="flex flex-col items-center text-center">
-          <span className="eyebrow">
-            <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
-            Questions
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
+            <HelpCircle className="h-3.5 w-3.5" /> Frequently Asked Questions
           </span>
-          <h2 className="mt-5 text-3xl sm:text-5xl font-bold tracking-tight text-balance">
-            Everything you&rsquo;re about to <span className="text-gradient">ask.</span>
+          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
+            Frequently asked questions.
           </h2>
-          <p className="mt-4 max-w-2xl text-base sm:text-lg text-muted-foreground text-balance">
-            No fine print, no surprises. Here&rsquo;s what teams want to know before they
-            forge their first plan.
-          </p>
         </Reveal>
 
-        <RevealStagger className="mt-12 sm:mt-16 grid gap-4">
+        <RevealStagger className="mt-12 grid gap-3">
           {FAQS.map((item, index) => {
             const isOpen = openIndex === index
-            const panelId = `faq-panel-${index}`
-            const buttonId = `faq-button-${index}`
-
             return (
-              <RevealItem key={item.q} className="surface-card surface-card-hover overflow-hidden">
-                <h3>
-                  <button
-                    id={buttonId}
-                    type="button"
-                    aria-expanded={isOpen}
-                    aria-controls={panelId}
-                    onClick={() => setOpenIndex(isOpen ? null : index)}
-                    className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left sm:px-6 sm:py-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl"
+              <RevealItem key={item.q} className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(isOpen ? null : index)}
+                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left sm:px-6 sm:py-5 cursor-pointer"
+                >
+                  <span className="text-sm sm:text-base font-bold text-slate-900">
+                    {item.q}
+                  </span>
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 transition-transform ${
+                      isOpen ? 'rotate-180 text-blue-600 bg-blue-50' : 'text-slate-500'
+                    }`}
                   >
-                    <span className="text-base sm:text-lg font-semibold text-foreground">
-                      {item.q}
-                    </span>
-                    <motion.span
-                      aria-hidden="true"
-                      animate={{ rotate: isOpen ? 180 : 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-colors ${
-                        isOpen ? 'text-primary' : 'text-muted-foreground'
-                      }`}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </motion.span>
-                  </button>
-                </h3>
+                    <ChevronDown className="h-4 w-4" />
+                  </span>
+                </button>
 
                 <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
-                      id={panelId}
-                      role="region"
-                      aria-labelledby={buttonId}
-                      key="content"
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                      transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <p className="px-5 pb-5 sm:px-6 sm:pb-6 text-sm sm:text-base leading-relaxed text-muted-foreground">
+                      <p className="px-5 pb-5 sm:px-6 sm:pb-6 text-xs sm:text-sm leading-relaxed text-slate-600 border-t border-slate-100 pt-3">
                         {item.a}
                       </p>
                     </motion.div>

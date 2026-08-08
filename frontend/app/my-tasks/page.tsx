@@ -2,21 +2,36 @@
 
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { listProjects, getProject, updateBacklog, getUsers } from '@/lib/api'
+import { listProjects, getProject, updateBacklog } from '@/lib/api'
 import { useAppUser } from '@/lib/auth-context'
-import { Clock, Layers, Link2, Target, ListChecks, Gauge } from 'lucide-react'
+import { Clock, Layers, ListChecks, Link2 } from 'lucide-react'
 import Link from 'next/link'
+import { TopNavbar } from '@/components/layout/top-navbar'
+import { WorkspaceAuthGate } from '@/components/auth/workspace-auth-gate'
 
 const priorityPill: Record<string, string> = {
-  critical: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
-  high: 'bg-red-500/20 text-red-400 border border-red-500/30',
-  medium: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-  low: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+  critical: 'bg-rose-50 text-rose-700 border-rose-200',
+  high: 'bg-red-50 text-red-700 border-red-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-200',
+  low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
 const KANBAN_COLUMNS = ['To Do', 'In Progress', 'In Review', 'Done']
 
 export default function MyTasksPage() {
+  return (
+    <WorkspaceAuthGate>
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
+        <TopNavbar />
+        <main className="flex-1 relative z-10 pt-24 pb-16 px-6 max-w-7xl mx-auto w-full">
+          <TasksContent />
+        </main>
+      </div>
+    </WorkspaceAuthGate>
+  )
+}
+
+function TasksContent() {
   const { user } = useAppUser()
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,7 +78,6 @@ export default function MyTasksPage() {
     setTasks(prev => prev.map(t => t.title === title && t.project_id === project_id ? { ...t, status } : t))
     
     try {
-      // Find the project and update the task inside it
       const fullProject = await getProject(project_id)
       if (!fullProject || !fullProject.backlog) return
       
@@ -71,90 +85,109 @@ export default function MyTasksPage() {
       await updateBacklog(project_id, { ...fullProject.backlog, tasks: newTasks })
     } catch (err) {
       console.error("Failed to update status", err)
-      // Rollback on fail
       fetchTasks()
     }
   }
 
   const renderTaskCard = (task: any, idx: number) => {
     return (
-      <motion.div
-        key={`${task.project_id}-${task.title}-${idx}`}
+      <div
+        key={`${task.title}-${idx}`}
         draggable
         onDragStart={(e: any) => e.dataTransfer.setData('application/json', JSON.stringify({ title: task.title, project_id: task.project_id }))}
-        className="p-3 bg-card/60 border border-white/10 rounded-lg hover:border-primary/50 hover:bg-card/80 transition-colors cursor-grab active:cursor-grabbing"
-        whileHover={{ y: -3 }}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
+        className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing shadow-xs"
       >
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-foreground leading-snug">{task.title}</p>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 capitalize ${priorityPill[task.priority] || priorityPill.medium}`}>
+          <p className="font-semibold text-xs text-slate-900 leading-snug">{task.title}</p>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 capitalize ${priorityPill[task.priority] || priorityPill.medium}`}>
             {task.priority || 'medium'}
           </span>
         </div>
 
-        <Link href={`/workspace?project=${task.project_id}`} className="text-xs text-primary hover:underline mt-1 block truncate">
-          {task.project_title}
-        </Link>
+        <p className="text-[11px] text-blue-600 font-medium mt-1">
+          Project: {task.project_title}
+        </p>
 
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           {task.category && (
-            <span className="text-[10px] uppercase tracking-wide text-secondary bg-[#7c3aed]/15 border border-[#7c3aed]/25 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
               {task.category}
             </span>
           )}
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
-            <Clock className="w-3 h-3" /> {task.estimated_days}d
+          <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+            <Clock className="w-3 h-3 text-slate-400" /> {task.estimated_days}d
           </span>
         </div>
-      </motion.div>
-    )
-  }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[600px]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        {task.epic && (
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center gap-1 text-[10px] text-slate-500">
+            <Layers className="w-3 h-3 text-slate-400" /> {task.epic}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto mt-16">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">My Tasks</h1>
-        <p className="text-muted-foreground mt-2">All tasks assigned to you across every project.</p>
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+              <ListChecks className="w-5 h-5" />
+            </div>
+            My Assigned Tasks
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Global Kanban board of all tasks assigned to you across Devflow projects.
+          </p>
+        </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
-        {KANBAN_COLUMNS.map((colName) => {
-          const colTasks = tasks.filter((t: any) => t.status === colName)
-          return (
-            <div
-              key={colName}
-              className="glass-panel-dark p-4 rounded-xl flex-shrink-0 w-[300px] flex flex-col h-full min-h-[400px]"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => handleDrop(e, colName)}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">{colName}</h3>
-                <span className="text-xs font-mono text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
-                  {colTasks.length}
-                </span>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-64 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+          ))}
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="p-16 text-center bg-white border border-slate-200 rounded-2xl shadow-xs">
+          <ListChecks className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-slate-900">No tasks assigned</h3>
+          <p className="text-slate-500 text-xs mt-1 max-w-sm mx-auto">
+            You don&apos;t have any tasks assigned to your account yet. Assign tasks in project sprint boards.
+          </p>
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+          {KANBAN_COLUMNS.map((colName) => {
+            const colTasks = tasks.filter((t: any) => t.status === colName)
+            return (
+              <div
+                key={colName}
+                className="bg-slate-100/70 border border-slate-200 p-4 rounded-2xl flex-shrink-0 w-[290px] flex flex-col h-full min-h-[420px]"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, colName)}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">{colName}</h3>
+                  <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                    {colTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-3 flex-1">
+                  {colTasks.map((task: any, idx: number) => renderTaskCard(task, idx))}
+                  {colTasks.length === 0 && (
+                    <div className="border border-dashed border-slate-300 rounded-xl p-4 text-center text-xs text-slate-400">
+                      Drop tasks here
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="space-y-3 flex-1">
-                {colTasks.map((task: any, idx: number) => renderTaskCard(task, idx))}
-                {colTasks.length === 0 && (
-                  <div className="border border-dashed border-white/10 rounded-lg p-4 text-center text-xs text-muted-foreground opacity-50">
-                    Drop tasks here
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

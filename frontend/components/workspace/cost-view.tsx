@@ -6,7 +6,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from '@/component
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
 
-const PALETTE = ['#00d9ff', '#7c3aed', '#06b6d4', '#a78bfa', '#10b981', '#f43f5e', '#eab308', '#3b82f6']
+const PALETTE = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#0284c7', '#e11d48', '#4f46e5', '#0d9488']
 
 function fmt(n: number): string {
   return `$${Math.round(n).toLocaleString()}`
@@ -18,10 +18,10 @@ export function CostView() {
 
   if (!cost) {
     return (
-      <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <h2 className="text-2xl font-bold text-foreground">Cost Estimation</h2>
-        <GeneratingPanel label="Cost estimate" />
-      </motion.div>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Financial & Cost Estimation</h2>
+        <GeneratingPanel label="Cost & Budget Estimation" />
+      </div>
     )
   }
 
@@ -32,103 +32,107 @@ export function CostView() {
     .map((l, i) => ({ name: l.category, value: Math.round((l.monthly_usd / (total || 1)) * 100), fill: PALETTE[i % PALETTE.length] }))
     .filter((d) => d.value > 0)
   const months = Math.max(1, Math.round(cost.duration_months || 6))
-  const timelineData = Array.from({ length: months }, (_, i) => ({ month: `M${i + 1}`, cost: Math.round(total * (i + 1)) }))
+  const timelineData = Array.from({ length: months }, (_, i) => ({ month: `Month ${i + 1}`, cost: Math.round(total * (i + 1)) }))
 
   return (
-    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+    <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Cost Estimation</h2>
-        <p className="text-muted-foreground mt-1">Budget allocation derived from the staffing plan & architecture</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Cost Modeling</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Budget breakdown derived from engineering rate cards, cloud infrastructure, and timeline duration
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryCard label="Monthly Burn" value={fmt(total)} sub="All-in" valueClass="text-primary" />
-        <SummaryCard label="Project Total" value={fmt(cost.project_total_usd)} sub={`Over ${months} months`} valueClass="text-accent" />
-        <SummaryCard label="Largest Cost" value={lines.length ? lines.reduce((a, b) => (a.monthly_usd > b.monthly_usd ? a : b)).category.split(' ')[0] : '—'} sub="Category" valueClass="text-cyan-400" />
-        <SummaryCard label="Cost Lines" value={String(lines.length)} sub="Tracked" valueClass="text-secondary" />
+      {/* Snapshot Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <SummaryCard label="Monthly Run Rate" value={fmt(total)} sub="All-in Staffing + Cloud" color="text-blue-600" />
+        <SummaryCard label="Project Total" value={fmt(cost.project_total_usd)} sub={`Across ${months} Months`} color="text-slate-900" />
+        <SummaryCard label="Top Spend Category" value={lines.length ? lines.reduce((a, b) => (a.monthly_usd > b.monthly_usd ? a : b)).category.split(' ')[0] : '—'} sub="Staffing / Engineering" color="text-indigo-600" />
+        <SummaryCard label="Tracked Cost Lines" value={String(lines.length)} sub="Budget Categories" color="text-emerald-600" />
       </div>
 
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div className="glass-panel p-6 rounded-lg" whileHover={{ scale: 1.01 }}>
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg">Monthly Cost by Category</CardTitle>
-            <CardDescription>Where the budget goes each month</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="category" stroke="#94a3b8" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={70} />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip contentStyle={{ backgroundColor: '#0f1428', border: '1px solid #1e293b' }} />
-                <Bar dataKey="monthly" fill="#00d9ff" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </motion.div>
+        {/* Monthly Cost by Category */}
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Monthly Cost by Category</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Staffing & cloud resource monthly breakdown</p>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={barData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="category" stroke="#64748b" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={60} />
+              <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <Bar dataKey="monthly" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-        <motion.div className="glass-panel p-6 rounded-lg" whileHover={{ scale: 1.01 }}>
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg">Budget Breakdown</CardTitle>
-            <CardDescription>Share of monthly spend</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" labelLine={false} label={(e: any) => `${e.value}%`} outerRadius={90} dataKey="value">
-                  {pieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#0f1428', border: '1px solid #1e293b' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </motion.div>
+        {/* Budget Share */}
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Budget Share Distribution</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Proportional allocation of monthly burn</p>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" labelLine={false} label={(e: any) => `${e.value}%`} outerRadius={85} dataKey="value">
+                {pieData.map((entry, index) => (
+                  <Cell key={index} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
 
-        <motion.div className="glass-panel p-6 rounded-lg lg:col-span-2" whileHover={{ scale: 1.01 }}>
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg">Cumulative Spend</CardTitle>
-            <CardDescription>Projected spend over the delivery timeline</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip contentStyle={{ backgroundColor: '#0f1428', border: '1px solid #1e293b' }} />
-                <Line type="monotone" dataKey="cost" stroke="#00d9ff" dot={{ fill: '#7c3aed' }} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </motion.div>
+        {/* Cumulative Timeline Spend */}
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs lg:col-span-2">
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Cumulative Milestone Spend</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Projected capital deployment across project lifecycle</p>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={timelineData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <Line type="monotone" dataKey="cost" stroke="#2563eb" strokeWidth={2.5} dot={{ fill: '#2563eb', strokeWidth: 2, r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      <div className="glass-panel p-6 rounded-lg">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Line Items</h3>
-        <div className="space-y-2">
+      {/* Line Items List */}
+      <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Detailed Budget Items</h3>
+        <div className="space-y-2.5">
           {lines.map((l, i) => (
-            <div key={i} className="flex items-center justify-between p-3 bg-card/50 border border-white/5 rounded-lg">
+            <div key={i} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
               <div>
-                <p className="text-sm text-foreground">{l.category}</p>
-                {l.notes && <p className="text-xs text-muted-foreground">{l.notes}</p>}
+                <p className="text-xs font-bold text-slate-900">{l.category}</p>
+                {l.notes && <p className="text-xs text-slate-500 mt-0.5">{l.notes}</p>}
               </div>
-              <p className="text-sm font-semibold text-primary">{fmt(l.monthly_usd)}/mo</p>
+              <p className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">
+                {fmt(l.monthly_usd)}/mo
+              </p>
             </div>
           ))}
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-function SummaryCard({ label, value, sub, valueClass }: { label: string; value: string; sub: string; valueClass: string }) {
+function SummaryCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <motion.div className="glass-panel p-4 rounded-lg" whileHover={{ scale: 1.02 }}>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-bold mt-2 ${valueClass}`}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-    </motion.div>
+    <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+      <p className="text-xs text-slate-500 mt-0.5">{sub}</p>
+    </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import { Sparkles, X, Send, Loader2, Minus, Bot } from 'lucide-react'
+import { Sparkles, Send, Loader2, Minus, Bot } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useProjectStore } from '@/lib/project-store'
 import { askAssistant } from '@/lib/api'
@@ -16,13 +16,12 @@ const QUICK = [
   'Where is most of the budget going?',
 ]
 
-// Tiny, safe markdown-ish renderer for assistant replies (bold + bullets + paragraphs).
 function Rich({ text }: { text: string }) {
   const blocks = text.split(/\n{2,}/)
   const fmt = (s: string) =>
     s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
       part.startsWith('**') && part.endsWith('**') ? (
-        <strong key={i} className="text-foreground">{part.slice(2, -2)}</strong>
+        <strong key={i} className="text-slate-900 font-semibold">{part.slice(2, -2)}</strong>
       ) : (
         <span key={i}>{part}</span>
       ),
@@ -34,10 +33,10 @@ function Rich({ text }: { text: string }) {
         const isList = lines.every((l) => /^\s*[-*+•]\s+/.test(l) || l.trim() === '')
         if (isList) {
           return (
-            <ul key={i} className="space-y-1 list-none">
+            <ul key={i} className="space-y-1 list-none pl-1">
               {lines.filter((l) => l.trim()).map((l, j) => (
-                <li key={j} className="flex gap-1.5">
-                  <span className="text-primary mt-0.5">•</span>
+                <li key={j} className="flex gap-2 items-start">
+                  <span className="text-blue-600 mt-1 text-xs">•</span>
                   <span>{fmt(l.replace(/^\s*[-*+•]\s+/, ''))}</span>
                 </li>
               ))}
@@ -69,11 +68,10 @@ export function AiAssistant() {
         {
           role: 'assistant',
           content:
-            "Hi — I'm your Devflow copilot. I can read this project's full plan: requirements, backlog, risks, team, cost and timeline. Ask me anything, or tap a suggestion below.",
+            "Hi — I'm your Devflow Copilot. I can query this project's complete plan: requirements, architecture, backlog, risks, team, budget, and timeline.",
         },
       ])
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -84,7 +82,11 @@ export function AiAssistant() {
     const q = text.trim()
     if (!q || busy) return
     if (!projectId) {
-      setMessages((m) => [...m, { role: 'user', content: q }, { role: 'assistant', content: 'Open a project first — then I can answer from its plan.' }])
+      setMessages((m) => [
+        ...m,
+        { role: 'user', content: q },
+        { role: 'assistant', content: 'Open a project first — then I can answer questions grounded in its plan.' },
+      ])
       setInput('')
       return
     }
@@ -96,7 +98,10 @@ export function AiAssistant() {
       const { reply } = await askAssistant(projectId, q, history)
       setMessages((m) => [...m, { role: 'assistant', content: reply || 'No answer returned.' }])
     } catch (e) {
-      setMessages((m) => [...m, { role: 'assistant', content: 'I hit an error reaching the model. Is the backend running?' }])
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', content: 'I encountered an error reaching the model service. Please retry in a moment.' },
+      ])
     } finally {
       setBusy(false)
     }
@@ -107,21 +112,13 @@ export function AiAssistant() {
       {/* Floating launcher */}
       <AnimatePresence>
         {!aiPanelOpen && (
-          <motion.button
+          <button
             onClick={() => setAiPanelOpen(true)}
-            className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-full bg-primary pl-4 pr-5 py-3 text-primary-foreground font-medium shadow-[0_0_40px_-8px_var(--primary)]"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 pl-4 pr-5 py-2.5 text-white font-medium shadow-lg hover:shadow-xl transition-all cursor-pointer text-xs"
           >
-            <span className="relative flex">
-              <Sparkles className="w-5 h-5" />
-              <span className="absolute -inset-1 rounded-full bg-white/30 blur-md animate-pulse-glow -z-10" />
-            </span>
-            Ask the copilot
-          </motion.button>
+            <Sparkles className="w-4 h-4" />
+            Devflow Copilot
+          </button>
         )}
       </AnimatePresence>
 
@@ -129,98 +126,95 @@ export function AiAssistant() {
       <AnimatePresence>
         {aiPanelOpen && (
           <motion.div
-            className="fixed bottom-6 right-6 z-40 flex flex-col w-[min(92vw,400px)] h-[min(76vh,620px)] rounded-2xl border border-white/10 bg-card/80 backdrop-blur-2xl shadow-[0_24px_80px_-20px_rgba(0,0,0,0.8)] overflow-hidden"
-            initial={{ opacity: 0, y: 30, scale: 0.92 }}
+            className="fixed bottom-6 right-6 z-40 flex flex-col w-[min(92vw,400px)] h-[min(76vh,580px)] rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.92 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
           >
-            {/* header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-primary/15 to-secondary/10">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <span className="grid place-items-center w-8 h-8 rounded-lg bg-primary/20 border border-primary/30">
-                  <Bot className="w-4.5 h-4.5 text-primary" />
-                </span>
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                  <Bot className="w-4 h-4" />
+                </div>
                 <div>
-                  <div className="text-sm font-semibold text-foreground leading-none">Devflow Copilot</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    {ready ? 'Grounded in this project' : 'Waiting for the plan…'}
+                  <div className="text-xs font-bold text-slate-900">Devflow Copilot</div>
+                  <div className="text-[10px] text-slate-500">
+                    {ready ? 'Grounded in project plan' : 'Awaiting project plan…'}
                   </div>
                 </div>
               </div>
-              <button onClick={() => setAiPanelOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground" aria-label="Minimize">
+              <button
+                onClick={() => setAiPanelOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors"
+                title="Minimize"
+              >
                 <Minus className="w-4 h-4" />
               </button>
             </div>
 
-            {/* messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
               {messages.map((m, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-primary/20 text-foreground border border-primary/30 rounded-br-sm'
-                        : 'bg-white/5 text-muted-foreground border border-white/10 rounded-bl-sm'
+                        ? 'bg-blue-600 text-white rounded-br-xs'
+                        : 'bg-slate-100 text-slate-800 border border-slate-200/80 rounded-bl-xs'
                     }`}
                   >
                     {m.role === 'assistant' ? <Rich text={m.content} /> : m.content}
                   </div>
-                </motion.div>
+                </div>
               ))}
               {busy && (
                 <div className="flex justify-start">
-                  <div className="flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-3.5 py-2.5 text-sm text-muted-foreground">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> Thinking…
+                  <div className="flex items-center gap-2 rounded-2xl bg-slate-100 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-600">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                    Analyzing project context…
                   </div>
                 </div>
               )}
             </div>
 
-            {/* quick actions */}
-            {messages.length <= 1 && (
-              <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                {QUICK.map((q) => (
+            {/* Suggestions & Input */}
+            <div className="p-3 border-t border-slate-200 bg-slate-50 space-y-2">
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1">
+                {QUICK.map((q, i) => (
                   <button
-                    key={q}
+                    key={i}
                     onClick={() => send(q)}
-                    className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                    className="flex-shrink-0 text-[11px] font-medium bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 hover:border-blue-200 rounded-full px-2.5 py-1 transition-colors"
                   >
                     {q}
                   </button>
                 ))}
               </div>
-            )}
 
-            {/* input */}
-            <div className="p-3 border-t border-white/10">
-              <div className="flex items-end gap-2 rounded-xl border border-white/12 bg-background/60 px-3 py-2">
-                <textarea
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  send(input)
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      send(input)
-                    }
-                  }}
-                  rows={1}
-                  placeholder="Ask about this plan…"
-                  className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none max-h-24"
+                  placeholder="Ask anything about this plan…"
+                  className="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={() => send(input)}
-                  disabled={busy || !input.trim()}
-                  className="grid place-items-center w-8 h-8 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 transition-opacity"
+                  type="submit"
+                  disabled={!input.trim() || busy}
+                  className="p-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors cursor-pointer"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5" />
                 </button>
-              </div>
+              </form>
             </div>
           </motion.div>
         )}

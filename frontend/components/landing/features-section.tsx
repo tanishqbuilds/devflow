@@ -13,54 +13,13 @@ import {
 } from 'lucide-react'
 import { Reveal, RevealStagger, RevealItem } from './reveal'
 
-type Accent = {
-  /** icon foreground tint */
-  text: string
-  /** icon chip background tint */
-  chip: string
-  /** subtle radial glow color (rgba) layered behind the card */
-  glow: string
-}
-
-const ACCENTS: Record<string, Accent> = {
-  cyan: {
-    text: 'text-cyan-300',
-    chip: 'bg-cyan-400/10 ring-1 ring-cyan-400/20',
-    glow: 'rgba(0,217,255,0.16)',
-  },
-  violet: {
-    text: 'text-violet-300',
-    chip: 'bg-violet-400/10 ring-1 ring-violet-400/20',
-    glow: 'rgba(124,58,237,0.18)',
-  },
-  emerald: {
-    text: 'text-emerald-300',
-    chip: 'bg-emerald-400/10 ring-1 ring-emerald-400/20',
-    glow: 'rgba(16,185,129,0.16)',
-  },
-  amber: {
-    text: 'text-amber-300',
-    chip: 'bg-amber-400/10 ring-1 ring-amber-400/20',
-    glow: 'rgba(245,158,11,0.16)',
-  },
-  sky: {
-    text: 'text-sky-300',
-    chip: 'bg-sky-400/10 ring-1 ring-sky-400/20',
-    glow: 'rgba(56,189,248,0.16)',
-  },
-  fuchsia: {
-    text: 'text-fuchsia-300',
-    chip: 'bg-fuchsia-400/10 ring-1 ring-fuchsia-400/20',
-    glow: 'rgba(217,70,239,0.16)',
-  },
-}
-
 type Feature = {
   icon: typeof Calculator
   title: string
   body: string
-  accent: keyof typeof ACCENTS
-  /** grid span classes for the bento layout (lg breakpoint) */
+  color: string
+  bg: string
+  border: string
   span?: string
   hero?: boolean
 }
@@ -68,125 +27,102 @@ type Feature = {
 const FEATURES: Feature[] = [
   {
     icon: Calculator,
-    title: 'Estimates you can actually defend.',
-    body: 'Effort and cost ranges with the assumptions shown — not a magic number.',
-    accent: 'cyan',
+    title: 'Defensible Financial & Effort Estimates',
+    body: 'Granular development days, role compensation rate cards, and cloud infrastructure modeling with full transparency.',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
     span: 'lg:col-span-2 lg:row-span-2',
     hero: true,
   },
   {
     icon: ListChecks,
-    title: "A backlog that's ready to assign.",
-    body: 'Epics → stories → tasks, each with acceptance criteria and dependencies.',
-    accent: 'violet',
+    title: "Sprint-Ready Backlog & Epics",
+    body: 'User stories structured with MoSCoW priorities, story point weights, and acceptance criteria.',
+    color: 'text-purple-600',
+    bg: 'bg-purple-50',
+    border: 'border-purple-200',
   },
   {
     icon: ShieldAlert,
-    title: 'See the risks before they bill you.',
-    body: 'A costed risk register, ranked, each with a concrete mitigation.',
-    accent: 'emerald',
+    title: 'Pre-Emptive Security & Risk Auditing',
+    body: 'Automated OWASP Top 10, GDPR/SOC2 compliance threat modeling, and mitigation blueprints.',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
   },
   {
     icon: Users,
-    title: 'Right-sized team, on day one.',
-    body: 'Roles, seniority and headcount derived from real scope.',
-    accent: 'amber',
+    title: 'Optimized Engineering Staffing',
+    body: 'Right-sized FTE roles, seniority distribution, and ownership matrices aligned to scope.',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
   },
   {
     icon: Workflow,
-    title: 'A live architecture diagram.',
-    body: 'A component diagram generated from the chosen stack.',
-    accent: 'sky',
+    title: 'Interactive Distributed Architecture',
+    body: 'Visual component topologies, database schemas, and API contracts generated dynamically.',
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+    border: 'border-sky-200',
   },
   {
     icon: Share2,
-    title: 'Export to the tools you use.',
-    body: 'Linear, Jira, Notion, Markdown. Your plan, your tools, no lock-in.',
-    accent: 'fuchsia',
+    title: 'Multi-Format Export & Integrations',
+    body: 'Seamlessly export to Jira, Linear, Notion, and Markdown specifications with zero lock-in.',
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
     span: 'sm:col-span-2 lg:col-span-1',
   },
 ]
 
 function FeatureCard({ feature }: { feature: Feature }) {
-  const accent = ACCENTS[feature.accent]
   const Icon = feature.icon
 
   return (
     <RevealItem className={feature.span}>
-      <motion.article
-        whileHover={{ y: -4 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-        className={`surface-card surface-card-hover group relative h-full overflow-hidden ${
+      <div
+        className={`bg-white border border-slate-200 rounded-2xl shadow-xs hover:border-slate-300 hover:shadow-md transition-all h-full flex flex-col ${
           feature.hero ? 'p-7 sm:p-9' : 'p-6'
         }`}
       >
-        {/* accent glow that warms up on hover */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full opacity-60 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
-          style={{ background: `radial-gradient(circle, ${accent.glow}, transparent 70%)` }}
-        />
-
-        <div className="relative flex h-full flex-col">
-          <div className="flex items-start justify-between">
-            <span
-              className={`inline-flex items-center justify-center rounded-xl ${accent.chip} ${
-                feature.hero ? 'h-12 w-12' : 'h-11 w-11'
-              }`}
-            >
-              <Icon
-                className={`${accent.text} ${feature.hero ? 'h-6 w-6' : 'h-5 w-5'}`}
-                strokeWidth={1.75}
-                aria-hidden
-              />
-            </span>
-
-            {feature.hero && (
-              <span className="eyebrow">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden /> Core output
-              </span>
-            )}
-
-            {!feature.hero && (
-              <ArrowUpRight
-                className="h-4 w-4 text-muted-foreground/40 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground/70"
-                aria-hidden
-              />
-            )}
+        <div className="flex items-start justify-between">
+          <div className={`w-11 h-11 rounded-xl ${feature.bg} ${feature.border} border flex items-center justify-center ${feature.color}`}>
+            <Icon className="w-5 h-5" />
           </div>
 
-          <h3
-            className={`mt-5 font-semibold tracking-tight text-balance text-foreground ${
-              feature.hero ? 'text-2xl sm:text-3xl' : 'text-lg'
-            }`}
-          >
-            {feature.title}
-          </h3>
-
-          <p
-            className={`mt-2.5 text-muted-foreground ${
-              feature.hero ? 'text-base sm:text-lg max-w-md' : 'text-sm'
-            }`}
-          >
-            {feature.body}
-          </p>
-
-          {feature.hero && (
-            <div className="mt-auto pt-7">
-              <div className="flex flex-wrap gap-2">
-                {['Effort range', 'Cost band', 'Assumptions', 'Confidence'].map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground"
-                  >
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {feature.hero ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+              <Sparkles className="w-3.5 h-3.5" /> Core Deliverable
+            </span>
+          ) : (
+            <ArrowUpRight className="w-4 h-4 text-slate-400" />
           )}
         </div>
-      </motion.article>
+
+        <h3 className={`mt-5 font-bold text-slate-900 tracking-tight ${feature.hero ? 'text-2xl sm:text-3xl' : 'text-base'}`}>
+          {feature.title}
+        </h3>
+
+        <p className={`mt-2 text-slate-600 leading-relaxed ${feature.hero ? 'text-sm sm:text-base max-w-md' : 'text-xs'}`}>
+          {feature.body}
+        </p>
+
+        {feature.hero && (
+          <div className="mt-auto pt-6 flex flex-wrap gap-2">
+            {['Story Point Velocity', 'Role Rate Cards', 'Cloud Compute Sizing', 'Critical Path'].map((chip) => (
+              <span
+                key={chip}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </RevealItem>
   )
 }
@@ -196,15 +132,14 @@ export function FeaturesSection() {
     <section id="features" className="relative px-4 py-20 sm:py-28 scroll-mt-20">
       <div className="max-w-6xl mx-auto">
         <Reveal className="max-w-2xl">
-          <span className="eyebrow">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden /> What you get
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
+            <Sparkles className="w-3.5 h-3.5" /> Comprehensive SDLC Deliverables
           </span>
-          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-balance">
-            Not a doc. <span className="text-gradient">A plan you can build from.</span>
+          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
+            Not just documentation. <span className="text-gradient">An executable delivery plan.</span>
           </h2>
-          <p className="mt-4 text-muted-foreground sm:text-lg">
-            Every run produces the artifacts a real delivery team needs — estimated, ranked,
-            and ready to hand off.
+          <p className="mt-4 text-slate-600 sm:text-base leading-relaxed">
+            Every analysis run produces the exact structured artifacts that engineering teams, product managers, and executives need to start executing immediately.
           </p>
         </Reveal>
 

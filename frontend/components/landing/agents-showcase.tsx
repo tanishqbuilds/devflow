@@ -5,40 +5,40 @@ import {
 } from 'lucide-react'
 import { Reveal, RevealStagger, RevealItem } from './reveal'
 
-type AgentCard = { icon: any; name: string; role: string; output: string; color: string }
+type AgentCard = { icon: any; name: string; role: string; output: string; color: string; bg: string; border: string }
 
 const STAGES: { label: string; agents: AgentCard[] }[] = [
   {
-    label: 'Vision',
+    label: 'Stage 1: Executive Vision',
     agents: [
-      { icon: Crown, name: 'CEO', role: 'Chief Vision Officer', output: 'Executive summary, complexity & scope', color: 'text-amber-300' },
+      { icon: Crown, name: 'CEO Agent', role: 'Chief Vision Officer', output: 'Business goals, monetization model, and complexity analysis', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
     ],
   },
   {
-    label: 'Definition',
+    label: 'Stage 2: Product Definition',
     agents: [
-      { icon: ClipboardList, name: 'Product Manager', role: 'Senior PM', output: 'Requirements & user stories', color: 'text-cyan-300' },
+      { icon: ClipboardList, name: 'Product Manager Agent', role: 'Senior Product Manager', output: 'Functional & non-functional requirements and user stories', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
     ],
   },
   {
-    label: 'Design',
+    label: 'Stage 3: Technical Architecture',
     agents: [
-      { icon: Boxes, name: 'System Architect', role: 'Principal Architect', output: 'Layered architecture + diagram', color: 'text-violet-300' },
+      { icon: Boxes, name: 'System Architect Agent', role: 'Principal Architect', output: 'Distributed component design, data models, and cloud infrastructure', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
     ],
   },
   {
-    label: 'Planning (in parallel)',
+    label: 'Stage 4: Parallel Sprint & Delivery Planning',
     agents: [
-      { icon: ListChecks, name: 'Sprint Planner', role: 'Agile Lead', output: 'Epics, tasks, estimates, sprints', color: 'text-sky-300' },
-      { icon: ShieldAlert, name: 'Risk Analyst', role: 'Risk Analyst', output: 'Ranked risks + mitigations', color: 'text-rose-300' },
-      { icon: Users, name: 'Team Allocation', role: 'VP Engineering', output: 'Staffing plan → derived cost', color: 'text-emerald-300' },
+      { icon: ListChecks, name: 'Sprint Planner', role: 'Agile Delivery Lead', output: 'Epics, story points, and task dependency DAG', color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-200' },
+      { icon: ShieldAlert, name: 'Risk Analyst', role: 'Risk & Security Analyst', output: 'Ranked threat vectors and actionable mitigations', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' },
+      { icon: Users, name: 'Team Allocation', role: 'VP of Engineering', output: 'Engineering headcount modeling and financial rate cards', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
     ],
   },
   {
-    label: 'Delivery (in parallel)',
+    label: 'Stage 5: Parallel Delivery & DevOps Roadmap',
     agents: [
-      { icon: CalendarRange, name: 'Timeline', role: 'Delivery Manager', output: 'Milestones & roadmap', color: 'text-fuchsia-300' },
-      { icon: Plug, name: 'Integration', role: 'Platform / DevOps', output: 'Integrations & CI/CD plan', color: 'text-teal-300' },
+      { icon: CalendarRange, name: 'Timeline Agent', role: 'Delivery Director', output: 'Milestones, release gates, and critical path schedules', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' },
+      { icon: Plug, name: 'DevOps Agent', role: 'Platform Architect', output: 'GitHub Actions CI/CD workflows and Docker configurations', color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-200' },
     ],
   },
 ]
@@ -48,25 +48,26 @@ export function AgentsShowcase() {
     <section id="agents" className="relative px-4 py-20 sm:py-28 scroll-mt-20">
       <div className="max-w-5xl mx-auto">
         <Reveal className="text-center max-w-2xl mx-auto">
-          <span className="eyebrow">The AI organization</span>
-          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-balance">
-            Eight specialists. <span className="text-gradient">One coordinated plan.</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide shadow-xs">
+            Autonomous Multi-Agent Organization
+          </span>
+          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
+            Eight specialist agents. <span className="text-gradient">One coordinated delivery plan.</span>
           </h2>
-          <p className="mt-4 text-muted-foreground text-lg">
-            Not a single chatbot guess — a sequenced org where each agent builds on the last, and the
-            planning specialists work in parallel. Exactly how a senior team would scope it.
+          <p className="mt-4 text-slate-600 text-sm sm:text-base leading-relaxed">
+            Not a generic one-shot prompt — a choreographed multi-agent pipeline where each specialist cross-validates upstream artifacts and executes peer-to-peer consultations.
           </p>
         </Reveal>
 
-        <div className="mt-14 space-y-3">
+        <div className="mt-14 space-y-4">
           {STAGES.map((stage, si) => (
             <div key={stage.label}>
-              <Reveal direction="up" amount={0.4}>
-                <div className="mb-2 flex items-center gap-3">
-                  <span className="grid place-items-center w-7 h-7 rounded-full border border-primary/30 bg-primary/10 text-xs font-semibold text-primary">
+              <Reveal direction="up" amount={0.3}>
+                <div className="mb-2 flex items-center gap-2.5">
+                  <span className="grid place-items-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
                     {si + 1}
                   </span>
-                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     {stage.label}
                   </span>
                 </div>
@@ -75,16 +76,16 @@ export function AgentsShowcase() {
               <RevealStagger className="grid gap-3 sm:grid-cols-3">
                 {stage.agents.map((a) => (
                   <RevealItem key={a.name} className={stage.agents.length === 1 ? 'sm:col-span-3' : ''}>
-                    <div className="surface-card surface-card-hover p-4 h-full flex items-start gap-3">
-                      <span className="grid place-items-center w-10 h-10 rounded-xl border border-white/10 bg-white/[0.04] shrink-0">
-                        <a.icon className={`w-5 h-5 ${a.color}`} />
-                      </span>
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs hover:border-slate-300 hover:shadow-md transition-all h-full flex items-start gap-3.5">
+                      <div className={`w-10 h-10 rounded-xl ${a.bg} ${a.border} border flex items-center justify-center shrink-0 ${a.color}`}>
+                        <a.icon className="w-5 h-5" />
+                      </div>
                       <div>
                         <div className="flex items-baseline gap-2">
-                          <h3 className="font-semibold text-foreground">{a.name}</h3>
-                          <span className="text-[11px] text-muted-foreground">{a.role}</span>
+                          <h3 className="font-bold text-xs sm:text-sm text-slate-900">{a.name}</h3>
+                          <span className="text-[11px] font-medium text-slate-400">{a.role}</span>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">{a.output}</p>
+                        <p className="mt-1 text-xs text-slate-600 leading-relaxed">{a.output}</p>
                       </div>
                     </div>
                   </RevealItem>
@@ -92,8 +93,8 @@ export function AgentsShowcase() {
               </RevealStagger>
 
               {si < STAGES.length - 1 && (
-                <div className="flex justify-center py-1.5">
-                  <ArrowDown className="w-4 h-4 text-primary/40" />
+                <div className="flex justify-center py-2">
+                  <ArrowDown className="w-4 h-4 text-slate-300" />
                 </div>
               )}
             </div>

@@ -2,16 +2,15 @@
 
 import { motion } from 'framer-motion'
 import { Flag, Rocket, Beaker, Boxes, TrendingUp } from 'lucide-react'
-import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
 import type { MilestoneItem } from '@/lib/project-types'
 
-const phaseMeta: Record<string, { label: string; color: string; icon: any }> = {
-  mvp: { label: 'MVP', color: 'text-cyan-400', icon: Rocket },
-  beta: { label: 'Beta', color: 'text-purple-400', icon: Beaker },
-  production: { label: 'Production', color: 'text-emerald-400', icon: Boxes },
-  scaling: { label: 'Scaling', color: 'text-amber-400', icon: TrendingUp },
+const phaseMeta: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
+  mvp: { label: 'MVP Phase', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Rocket },
+  beta: { label: 'Beta Release', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: Beaker },
+  production: { label: 'Production Go-Live', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Boxes },
+  scaling: { label: 'Scale & Optimization', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: TrendingUp },
 }
 
 function addWeeks(iso: string | undefined, weeks: number): string {
@@ -26,10 +25,10 @@ export function MilestonesView() {
 
   if (!timeline) {
     return (
-      <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <h2 className="text-2xl font-bold text-foreground">Milestones & Roadmap</h2>
-        <GeneratingPanel label="Delivery timeline" />
-      </motion.div>
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Milestones & Delivery Roadmap</h2>
+        <GeneratingPanel label="Milestones & Delivery Roadmap" />
+      </div>
     )
   }
 
@@ -37,76 +36,97 @@ export function MilestonesView() {
   const created = project?.created_at
 
   return (
-    <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+    <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Milestones & Roadmap</h2>
-        <p className="text-muted-foreground mt-1">Delivery schedule across MVP → Beta → Production → Scaling</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Milestones & Delivery Roadmap</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Delivery schedule compiled by the Timeline Delivery Agent across MVP, Beta, and Production gates
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Total Milestones" value={String(milestones.length)} sub="Planned" valueClass="text-primary" />
-        <Stat label="Total Duration" value={`${timeline.total_duration_weeks} wks`} sub="End to end" valueClass="text-accent" />
-        <Stat label="Phases" value={String(new Set(milestones.map((m) => m.phase)).size)} sub="Distinct" valueClass="text-cyan-400" />
+      {/* Snapshot Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Stat label="Total Milestones" value={String(milestones.length)} sub="Sequenced Deliverables" color="text-blue-600" />
+        <Stat label="Total Estimated Duration" value={`${timeline.total_duration_weeks} Weeks`} sub="Kickoff to Scale" color="text-slate-900" />
+        <Stat label="Distinct Release Gates" value={String(new Set(milestones.map((m) => m.phase)).size)} sub="Phased Releases" color="text-indigo-600" />
       </div>
 
+      {/* Milestones List */}
       <div className="space-y-4">
         {milestones.map((m, index) => {
           const meta = phaseMeta[m.phase] || phaseMeta.mvp
           const Icon = meta.icon
           return (
-            <motion.div key={index} className="glass-panel p-5 rounded-lg border-l-4 border-primary/30"
-              initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.06 }} whileHover={{ scale: 1.01 }}>
-              <div className="flex gap-4">
-                <div className="flex flex-col items-center gap-2 min-w-[44px] pt-1">
-                  <Icon className={`w-5 h-5 ${meta.color}`} />
+            <div
+              key={index}
+              className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs hover:border-slate-300 transition-all"
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-10 h-10 rounded-xl ${meta.bg} ${meta.border} ${meta.text} border flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                  <Icon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 className="font-semibold text-foreground">{m.title}</h3>
-                    <span className={`text-xs font-medium ${meta.color}`}>{meta.label}</span>
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                    <h3 className="font-bold text-sm text-slate-900">{m.title}</h3>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${meta.bg} ${meta.border} ${meta.text}`}>
+                      {meta.label}
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {addWeeks(created, m.start_week)} → {addWeeks(created, m.start_week + m.duration_weeks)} · {m.duration_weeks} weeks
-                  </p>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-2">{m.description}</p>
+                  
+                  <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                    <span>{addWeeks(created, m.start_week)} → {addWeeks(created, m.start_week + m.duration_weeks)}</span>
+                    <span className="text-slate-300">•</span>
+                    <span>{m.duration_weeks} Weeks Duration</span>
+                  </div>
+
                   {m.deliverables?.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {m.deliverables.map((d, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[11px] text-foreground/80">{d}</span>
-                      ))}
+                    <div className="mt-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Deliverables</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.deliverables.map((d, i) => (
+                          <span key={i} className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 rounded-md text-xs font-medium text-slate-700">
+                            {d}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
+
                   {m.dependencies?.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground mt-2">Depends on: {m.dependencies.join(', ')}</p>
+                    <p className="text-[11px] text-slate-400 mt-2.5">
+                      <strong className="text-slate-500 font-semibold">Dependencies:</strong> {m.dependencies.join(', ')}
+                    </p>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           )
         })}
       </div>
 
+      {/* Critical Path Sequence */}
       {timeline.critical_path?.length > 0 && (
-        <motion.div className="glass-panel p-6 rounded-lg" whileHover={{ scale: 1.01 }}>
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg flex items-center gap-2"><Flag className="w-4 h-4 text-primary" /> Critical Path</CardTitle>
-            <CardDescription>Longest sequence of dependent milestones</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <div className="text-sm text-foreground">{timeline.critical_path.join('  →  ')}</div>
-          </CardContent>
-        </motion.div>
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-2">
+            <Flag className="w-4 h-4 text-blue-600" /> Critical Path Sequence
+          </h3>
+          <p className="text-xs text-slate-500 mb-3">Longest continuous dependency chain determining delivery timeline</p>
+          <div className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-4 leading-relaxed">
+            {timeline.critical_path.join('  ⟶  ')}
+          </div>
+        </div>
       )}
-    </motion.div>
+    </div>
   )
 }
 
-function Stat({ label, value, sub, valueClass }: { label: string; value: string; sub: string; valueClass: string }) {
+function Stat({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <motion.div className="glass-panel p-4 rounded-lg" whileHover={{ scale: 1.02 }}>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-bold mt-2 ${valueClass}`}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
-    </motion.div>
+    <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+      <p className="text-xs text-slate-500 mt-0.5">{sub}</p>
+    </div>
   )
 }

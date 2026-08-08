@@ -2,14 +2,14 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { Hexagon, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useAuth, useClerk } from '@clerk/nextjs'
 import Link from 'next/link'
 
 const NAV_LINKS = [
-  { label: 'How it works', href: '#how' },
-  { label: 'Features', href: '#features' },
-  { label: 'Migrate', href: '#migrate' },
+  { label: 'How It Works', href: '#how' },
+  { label: 'Platform Features', href: '#features' },
+  { label: 'Migration', href: '#migrate' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ]
@@ -21,7 +21,7 @@ export function LandingNavbar() {
   const { openSignIn } = useClerk()
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24)
+    const onScroll = () => setScrolled(window.scrollY > 20)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -37,36 +37,35 @@ export function LandingNavbar() {
       className="fixed top-0 inset-x-0 z-50 px-4 sm:px-6 pt-3"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
+      transition={{ duration: 0.5 }}
     >
       <div
         className={`max-w-6xl mx-auto flex items-center justify-between rounded-2xl px-4 sm:px-5 py-2.5 transition-all duration-300 ${
           scrolled
-            ? 'bg-background/70 backdrop-blur-xl border border-white/10 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)]'
+            ? 'bg-white/85 backdrop-blur-md border border-slate-200 shadow-sm'
             : 'bg-transparent border border-transparent'
         }`}
       >
         {/* Logo */}
-        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 group">
-          <div className="relative">
-            <Hexagon className="w-9 h-9 text-primary fill-primary/15 transition-transform group-hover:rotate-90 duration-500" strokeWidth={1.5} />
-            <span className="absolute inset-0 grid place-items-center text-[11px] font-bold text-primary">PF</span>
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 group cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+            DF
           </div>
-          <span className="text-lg font-semibold tracking-tight text-white">
-            Plan<span className="text-gradient">Forge</span>
+          <span className="text-lg font-bold tracking-tight text-slate-900">
+            Dev<span className="text-blue-600">flow</span>
           </span>
         </button>
 
         {/* Center links */}
         <div className="hidden md:flex items-center gap-1">
-          <Link href="/architecture" className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5 transition-colors">
+          <Link href="/architecture" className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors">
             Architecture
           </Link>
           {NAV_LINKS.map((l) => (
             <button
               key={l.href}
               onClick={() => scrollTo(l.href)}
-              className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5 transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
             >
               {l.label}
             </button>
@@ -76,21 +75,21 @@ export function LandingNavbar() {
         {/* Right */}
         <div className="hidden md:flex items-center gap-2">
           {isSignedIn ? (
-            <Link href="/my-projects" className="px-4 py-2 text-sm font-medium bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors">
+            <Link href="/my-projects" className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-xs">
               My Projects
             </Link>
           ) : (
             <button
               onClick={() => void openSignIn()}
-              className="px-3.5 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
             >
-              Login
+              Sign In
             </button>
           )}
         </div>
 
         {/* Mobile toggle */}
-        <button className="md:hidden p-2 text-foreground" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
+        <button className="md:hidden p-2 text-slate-700" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
@@ -98,25 +97,25 @@ export function LandingNavbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            className="md:hidden max-w-6xl mx-auto mt-2 rounded-2xl bg-background/90 backdrop-blur-xl border border-white/10 p-3"
+            className="md:hidden max-w-6xl mx-auto mt-2 rounded-2xl bg-white border border-slate-200 shadow-xl p-3"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
           >
-            <Link href="/architecture" onClick={() => setMobileOpen(false)} className="block w-full text-left px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg">
+            <Link href="/architecture" onClick={() => setMobileOpen(false)} className="block w-full text-left px-3 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
               Architecture
             </Link>
             {NAV_LINKS.map((l) => (
               <button
                 key={l.href}
                 onClick={() => scrollTo(l.href)}
-                className="block w-full text-left px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg"
+                className="block w-full text-left px-3 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
               >
                 {l.label}
               </button>
             ))}
             {isSignedIn ? (
-              <Link href="/my-projects" onClick={() => setMobileOpen(false)} className="mt-2 block text-center w-full px-4 py-2.5 text-sm font-medium bg-white/10 text-white rounded-lg">
+              <Link href="/my-projects" onClick={() => setMobileOpen(false)} className="mt-2 block text-center w-full px-4 py-2.5 text-xs font-semibold bg-blue-600 text-white rounded-lg">
                 My Projects
               </Link>
             ) : (
@@ -125,9 +124,9 @@ export function LandingNavbar() {
                   setMobileOpen(false)
                   void openSignIn()
                 }}
-                className="mt-2 w-full px-4 py-2.5 text-sm text-foreground border border-white/10 rounded-lg cursor-pointer"
+                className="mt-2 w-full px-4 py-2.5 text-xs font-semibold text-slate-900 bg-slate-100 rounded-lg cursor-pointer"
               >
-                Login
+                Sign In
               </button>
             )}
           </motion.div>
