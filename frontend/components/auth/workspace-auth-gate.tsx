@@ -1,12 +1,13 @@
 'use client'
 
-import { SignInButton, SignUpButton } from '@clerk/nextjs'
+import { useClerk } from '@clerk/nextjs'
 import Link from 'next/link'
 import { LogIn, ShieldCheck } from 'lucide-react'
 import { useAppUser } from '@/lib/auth-context'
 
 export function WorkspaceAuthGate({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAppUser()
+  const { openSignIn, openSignUp } = useClerk()
 
   if (!isLoaded) {
     return <div className="min-h-screen bg-[#050816]" />
@@ -24,16 +25,18 @@ export function WorkspaceAuthGate({ children }: { children: React.ReactNode }) {
           Your projects and AI responses are private and linked to your account.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <SignInButton mode="modal">
-            <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-black hover:bg-cyan-400">
-              <LogIn className="h-4 w-4" /> Login
-            </button>
-          </SignInButton>
-          <SignUpButton mode="modal">
-            <button className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-cyan-400/60">
-              Sign up
-            </button>
-          </SignUpButton>
+          <button
+            onClick={() => void openSignIn()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-black hover:bg-cyan-400 cursor-pointer"
+          >
+            <LogIn className="h-4 w-4" /> Login
+          </button>
+          <button
+            onClick={() => void openSignUp()}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-cyan-400/60 cursor-pointer"
+          >
+            Sign up
+          </button>
         </div>
         <Link href="/" className="mt-4 block text-xs text-muted-foreground hover:text-white">Back to home</Link>
       </section>

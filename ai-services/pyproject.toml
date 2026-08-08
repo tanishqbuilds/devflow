@@ -1,0 +1,19 @@
+[project]
+name = "devflow-ai-services"
+version = "0.1.0"
+description = "Devflow AI Services & Orchestration"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "gunicorn>=21.2.0",
+    "pydantic>=2.5.0",
+    "redis>=5.0.0",
+    "openai>=1.30.0",
+    "httpx>=0.26.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

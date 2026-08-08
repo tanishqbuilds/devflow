@@ -24,7 +24,7 @@ export function InputSection() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const { isLoaded, isSignedIn, user } = useAppUser()
-  const { redirectToSignIn } = useClerk()
+  const { openSignIn, redirectToSignIn } = useClerk()
 
   // Rotating typewriter placeholder
   // NOTE: All hooks must be called before any conditional return (Rules of Hooks)
@@ -33,20 +33,16 @@ export function InputSection() {
     const phrase = EXAMPLES[exampleIdx]
     let i = 0
     setPlaceholder('')
-    const type = setInterval(() => {
-      if (i < phrase.length) {
-        const nextCharacter = phrase[i]
-        setPlaceholder((p) => p + nextCharacter)
+    const timer = setInterval(() => {
+      if (i <= phrase.length) {
+        setPlaceholder(phrase.slice(0, i))
         i++
       } else {
-        clearInterval(type)
+        clearInterval(timer)
+        setTimeout(() => setExampleIdx((e) => (e + 1) % EXAMPLES.length), 2200)
       }
     }, 28)
-    const next = setTimeout(() => setExampleIdx((e) => (e + 1) % EXAMPLES.length), 5200)
-    return () => {
-      clearInterval(type)
-      clearTimeout(next)
-    }
+    return () => clearInterval(timer)
   }, [exampleIdx, input])
 
   if (user?.role === 'developer') {

@@ -142,14 +142,12 @@ platform for startups."*), and watch the AI organization work.
 
 | Component | URL |
 | --- | --- |
-| Frontend | http://localhost:3100 |
-| Backend API + Swagger | http://localhost:8010/docs |
-| AI Services + Swagger | http://localhost:8011/docs |
-| PostgreSQL | postgresql://devflow:devflow@localhost:5433/devflow |
-| Redis | redis://localhost:6380 |
-
-> Ports are intentionally offset (3100/8010/8011/6380) so Devflow runs alongside other
-> local stacks without colliding on 3000/8000/6379.
+| Frontend | http://localhost:3000 |
+| Backend API + Swagger | http://localhost:8000/docs |
+| AI Services + Swagger | http://localhost:8001/docs |
+| Langflow UI | http://localhost:7860 |
+| PostgreSQL | postgresql://devflow:devflow@localhost:5432/devflow |
+| Redis | redis://localhost:6379 |
 
 ---
 
@@ -165,7 +163,7 @@ GET  /agents                  -> the AI org roster
 WS   /projects/:id/stream     -> snapshot + buffered replay + live orchestration events
 ```
 
-Health checks: `GET /health` on both `:8010` and `:8011`.
+Health checks: `GET /health` on both `:8000` and `:8001`, and `GET /health` on `:7860`.
 
 ---
 

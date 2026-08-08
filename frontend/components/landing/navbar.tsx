@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Hexagon, Menu, X } from 'lucide-react'
-import { SignInButton, useAuth } from '@clerk/nextjs'
+import { useAuth, useClerk } from '@clerk/nextjs'
 import Link from 'next/link'
 
 const NAV_LINKS = [
@@ -18,6 +18,7 @@ export function LandingNavbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { isSignedIn } = useAuth()
+  const { openSignIn } = useClerk()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -79,11 +80,12 @@ export function LandingNavbar() {
               My Projects
             </Link>
           ) : (
-            <SignInButton mode="modal">
-              <button className="px-3.5 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors">
-                Login
-              </button>
-            </SignInButton>
+            <button
+              onClick={() => void openSignIn()}
+              className="px-3.5 py-1.5 text-sm text-foreground/80 hover:text-foreground transition-colors cursor-pointer"
+            >
+              Login
+            </button>
           )}
         </div>
 
@@ -118,11 +120,15 @@ export function LandingNavbar() {
                 My Projects
               </Link>
             ) : (
-              <SignInButton mode="modal">
-                <button className="mt-2 w-full px-4 py-2.5 text-sm text-foreground border border-white/10 rounded-lg">
-                  Login
-                </button>
-              </SignInButton>
+              <button
+                onClick={() => {
+                  setMobileOpen(false)
+                  void openSignIn()
+                }}
+                className="mt-2 w-full px-4 py-2.5 text-sm text-foreground border border-white/10 rounded-lg cursor-pointer"
+              >
+                Login
+              </button>
             )}
           </motion.div>
         )}

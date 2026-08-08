@@ -101,7 +101,7 @@ function ProjectsList() {
         <LayoutDashboard className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
         <h3 className="text-xl font-medium text-white">No projects yet</h3>
         <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          You haven't generated any projects. Head back to the landing page to start your first AI orchestration.
+          You haven&apos;t generated any projects. Head back to the landing page to start your first AI orchestration.
         </p>
       </div>
     )
@@ -144,7 +144,7 @@ function ProjectsList() {
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
               <Clock className="w-3.5 h-3.5" />
-              <span>{new Date(p.created_at || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <span>{p.created_at ? new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}</span>
             </div>
           </div>
         </motion.div>

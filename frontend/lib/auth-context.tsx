@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth, useClerk, useUser } from '@clerk/nextjs'
 import { setAuthTokenProvider, syncUser } from './api'
 
@@ -27,49 +27,87 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+const MOCK_DEMO_USER: AppUser = {
+  id: 'user_demo_devflow',
+  firstName: 'Demo',
+  lastName: 'User',
+  fullName: 'Demo User',
+  imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
+  primaryEmailAddress: { emailAddress: 'demo@devflow.ai' },
+  role: 'developer',
+}
+
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH !== 'false'
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, isSignedIn, isLoaded } = useUser()
-  const { getToken } = useAuth()
+  const { user: clerkUser, isSignedIn: clerkIsSignedIn, isLoaded: clerkIsLoaded } = useUser()
+  const { getToken: clerkGetToken } = useAuth()
   const { signOut, openSignIn } = useClerk()
   const [role, setRole] = useState<'manager' | 'developer'>('developer')
 
-  useEffect(() => {
-    setAuthTokenProvider(() => getToken())
-    return () => setAuthTokenProvider(null)
-  }, [getToken])
+  const isBypassed = BYPASS_AUTH || (!clerkUser && clerkIsLoaded)
+
+  const activeTokenProvider = useCallback(async () => {
+    if (clerkIsSignedIn && clerkUser) {
+      return clerkGetToken()
+    }
+    return 'demo-bypass-token'
+  }, [clerkIsSignedIn, clerkUser, clerkGetToken])
 
   useEffect(() => {
-    if (user && isSignedIn) {
-      syncUser({
-        clerk_id: user.id,
-        email: user.primaryEmailAddress?.emailAddress ?? '',
-        first_name: user.firstName ?? '',
-        last_name: user.lastName ?? '',
-        image_url: user.imageUrl,
-      }).then(res => {
-        if (res?.role) setRole(res.role)
-      }).catch(console.error)
+    setAuthTokenProvider(activeTokenProvider)
+    return () => setAuthTokenProvider(null)
+  }, [activeTokenProvider])
+
+  useEffect(() => {
+    const activeUser = (clerkIsSignedIn && clerkUser) ? {
+      clerk_id: clerkUser.id,
+      email: clerkUser.primaryEmailAddress?.emailAddress ?? '',
+      first_name: clerkUser.firstName ?? '',
+      last_name: clerkUser.lastName ?? '',
+      image_url: clerkUser.imageUrl,
+    } : {
+      clerk_id: MOCK_DEMO_USER.id,
+      email: MOCK_DEMO_USER.primaryEmailAddress.emailAddress,
+      first_name: MOCK_DEMO_USER.firstName,
+      last_name: MOCK_DEMO_USER.lastName,
+      image_url: MOCK_DEMO_USER.imageUrl,
     }
-  }, [user, isSignedIn])
+
+    syncUser(activeUser).then(res => {
+      if (res?.role) setRole(res.role)
+    }).catch(console.error)
+  }, [clerkUser, clerkIsSignedIn])
+
+  const activeUser = useMemo<AppUser>(() => {
+    if (clerkIsSignedIn && clerkUser) {
+      return {
+        id: clerkUser.id,
+        firstName: clerkUser.firstName ?? '',
+        lastName: clerkUser.lastName ?? '',
+        fullName: clerkUser.fullName ?? clerkUser.primaryEmailAddress?.emailAddress ?? 'Account',
+        imageUrl: clerkUser.imageUrl,
+        primaryEmailAddress: { emailAddress: clerkUser.primaryEmailAddress?.emailAddress ?? '' },
+        role,
+      }
+    }
+    return { ...MOCK_DEMO_USER, role }
+  }, [clerkUser, clerkIsSignedIn, role])
 
   const value = useMemo<AuthContextType>(() => ({
-    isSignedIn: isSignedIn ?? false,
-    isLoaded,
-    user: user ? {
-      id: user.id,
-      firstName: user.firstName ?? '',
-      lastName: user.lastName ?? '',
-      fullName: user.fullName ?? user.primaryEmailAddress?.emailAddress ?? 'Account',
-      imageUrl: user.imageUrl,
-      primaryEmailAddress: { emailAddress: user.primaryEmailAddress?.emailAddress ?? '' },
-      role,
-    } : null,
-    signOut: async () => { await signOut({ redirectUrl: '/' }) },
+    isSignedIn: true,
+    isLoaded: clerkIsLoaded ?? true,
+    user: activeUser,
+    signOut: async () => {
+      if (clerkIsSignedIn) {
+        await signOut({ redirectUrl: '/' })
+      }
+    },
     signIn: () => { void openSignIn() },
     updateProfile: () => {},
-    isClerk: true,
-    getToken,
-  }), [getToken, isLoaded, isSignedIn, openSignIn, signOut, user, role])
+    isClerk: !isBypassed,
+    getToken: activeTokenProvider,
+  }), [activeTokenProvider, activeUser, clerkIsLoaded, clerkIsSignedIn, isBypassed, openSignIn, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

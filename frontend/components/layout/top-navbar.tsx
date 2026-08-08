@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { useAppUser } from '@/lib/auth-context'
 import { Menu, Bell, Search, LogIn, Sparkles, ListChecks, FolderKanban } from 'lucide-react'
-import { SignInButton } from '@clerk/nextjs'
+import { useClerk } from '@clerk/nextjs'
 
 export function TopNavbar() {
   const { projectTitle, sidebarCollapsed, setSidebarCollapsed, aiPanelOpen, setAiPanelOpen, accountPanelOpen, setAccountPanelOpen } = useAppStore()
   const { user, isSignedIn, isLoaded } = useAppUser()
+  const { openSignIn } = useClerk()
 
   return (
     <motion.nav
@@ -127,15 +128,14 @@ export function TopNavbar() {
               />
             </motion.button>
           ) : (
-            <SignInButton mode="modal">
-              <motion.button
-                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-black text-xs font-semibold rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <LogIn className="w-3.5 h-3.5" /> Sign In
-              </motion.button>
-            </SignInButton>
+            <motion.button
+              onClick={() => void openSignIn()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 text-black text-xs font-semibold rounded-lg hover:bg-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all cursor-pointer"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <LogIn className="w-3.5 h-3.5" /> Sign In
+            </motion.button>
           )}
         </div>
       </div>

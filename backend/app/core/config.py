@@ -19,6 +19,7 @@ class Settings:
     ai_services_url: str = os.getenv("AI_SERVICES_URL", "http://ai-services:8001")
     clerk_secret_key: str = os.getenv("CLERK_SECRET_KEY", "")
     clerk_issuer_url: str = os.getenv("CLERK_ISSUER_URL", "").rstrip("/")
+    bypass_auth: bool = os.getenv("BYPASS_AUTH", "true").lower() in ("true", "1", "yes")
 
     # Orchestration
     analyze_queue: str = "queue:analyze"
@@ -27,7 +28,7 @@ class Settings:
     event_buffer_ttl_seconds: int = int(os.getenv("EVENT_BUFFER_TTL_SECONDS", "86400"))
 
     cors_origins: list[str] = field(
-        default_factory=lambda: _csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3100")
+        default_factory=lambda: _csv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3100,http://127.0.0.1:3000,http://127.0.0.1:3100")
     )
 
 

@@ -3,7 +3,7 @@
 // the host-published port, regardless of where the frontend itself runs.
 import type { ProjectDoc } from './project-types'
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8010').replace(/\/$/, '')
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 let tokenProvider: (() => Promise<string | null>) | null = null
 
 export function setAuthTokenProvider(provider: (() => Promise<string | null>) | null) {
