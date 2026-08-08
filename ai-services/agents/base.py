@@ -13,8 +13,9 @@ from typing import Any, Callable, Type
 
 from pydantic import BaseModel
 
-from llm.structured import generate_structured
+from llm.router import resolve
 from utils.logging import get_logger
+from workflows.agent_graph import build_agent_graph
 
 logger = get_logger("agents")
 
@@ -33,12 +34,16 @@ class Agent:
         """Execute the agent against the project context, returning a plain dict."""
         started = time.time()
         logger.info("▶ %s (%s) starting", self.name, self.id)
-        result = await generate_structured(
-            self.id,
-            self.system_prompt,
-            self.build_user_prompt(ctx),
-            self.schema,
+        graph = build_agent_graph(
+            agent_id=self.id,
+            system_prompt=self.system_prompt,
+            schema=self.schema,
+            model_config=resolve(self.id),
         )
+        state = await graph.ainvoke(
+            {"context": ctx, "user_prompt": self.build_user_prompt(ctx)}
+        )
+        result = state["result"]
         elapsed = time.time() - started
         logger.info("✓ %s finished in %.1fs", self.name, elapsed)
         return result.model_dump(mode="json")

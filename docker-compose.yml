@@ -64,8 +64,12 @@ services:
       - ./ai-services:/app
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://devflow:devflow@postgres:5432/devflow}
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     restart: unless-stopped
     extra_hosts:

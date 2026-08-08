@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from llm.client import get_llm_client
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+from llm.langchain_client import get_chat_model
 from llm.router import FAST_MODEL
 from prompts.context import (
     summarize_architecture,
@@ -101,21 +103,19 @@ async def chat(
     message: str,
     history: list[dict[str, str]] | None = None,
 ) -> str:
-    client = get_llm_client()
+    model = get_chat_model(model=FAST_MODEL, temperature=0.45, max_tokens=600)
     context = build_project_context(project)
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n--- PROJECT CONTEXT ---\n{context}"},
+    messages = [
+        SystemMessage(content=f"{SYSTEM_PROMPT}\n\n--- PROJECT CONTEXT ---\n{context}"),
     ]
     for turn in (history or [])[-6:]:
         role = turn.get("role")
-        if role in ("user", "assistant") and turn.get("content"):
-            messages.append({"role": role, "content": str(turn["content"])[:1500]})
-    messages.append({"role": "user", "content": message[:2000]})
+        content = str(turn.get("content", ""))[:1500]
+        if role == "user" and content:
+            messages.append(HumanMessage(content=content))
+        elif role == "assistant" and content:
+            messages.append(AIMessage(content=content))
+    messages.append(HumanMessage(content=message[:2000]))
 
-    resp = await client.chat.completions.create(
-        model=FAST_MODEL,
-        messages=messages,
-        temperature=0.45,
-        max_tokens=600,
-    )
-    return (resp.choices[0].message.content or "").strip()
+    response = await model.ainvoke(messages)
+    return str(response.content).strip()

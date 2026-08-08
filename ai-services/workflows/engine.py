@@ -6,9 +6,8 @@ Implements the orchestration graph:
                                         -> [Timeline | Integration]
 
 Stages run sequentially; agents *within* a stage run in parallel. The engine
-tracks per-node state and overall progress, emits events throughout, derives the
-cost section from the team plan and the architecture diagram from the
-architecture bundle, and is resilient to individual agent failures.
+tracks per-node state and overall progress, loads prior database versions
+for iterations, emits events throughout, and records versioned iteration snapshots.
 """
 from __future__ import annotations
 
@@ -18,6 +17,7 @@ from typing import Any
 import redis.asyncio as aioredis
 
 from agents.registry import AGENTS, get_agent
+from memory.project_memory import ProjectMemory
 from services.cost import compute_cost
 from services.diagram import build_diagram, build_mermaid
 from utils.logging import get_logger
@@ -62,9 +62,10 @@ TOTAL_UNITS = len(AGENTS)
 
 
 class WorkflowEngine:
-    def __init__(self, redis: aioredis.Redis, project_id: str):
+    def __init__(self, redis: aioredis.Redis, project_id: str, user_id: str | None = None):
         self._emitter = EventEmitter(redis, project_id)
         self._project_id = project_id
+        self._memory = ProjectMemory(project_id, user_id)
         self._ctx: dict[str, Any] = {}
         self._completed_units = 0
 
@@ -86,6 +87,9 @@ class WorkflowEngine:
                 self._ctx[section] = data
             if agent_id == "team_allocation":
                 await self._emit_cost()
+
+            # Record iteration state into memory & database
+            await self._memory.save_iteration_diff(section, data)
 
             await self._emitter.section_complete(agent_id, section, node, data)
             await self._emitter.node_update(node, "complete", 100, agent.name)
@@ -115,7 +119,16 @@ class WorkflowEngine:
         await self._emitter.section_complete("team_allocation", "cost", "cost", cost)
 
     async def run(self, idea: str, title: str | None = None) -> dict[str, Any]:
-        self._ctx = {"idea": idea}
+        # Pre-load prior database state and conversation context for iterations
+        prior_context = await self._memory.get_previous_project_context()
+        chat_context = await self._memory.get_project_chat_context()
+
+        self._ctx = {
+            "idea": idea,
+            "project_id": self._project_id,
+            "prior_project_database": prior_context,
+            "chat_history": chat_context,
+        }
         if title:
             self._ctx["title"] = title
 
