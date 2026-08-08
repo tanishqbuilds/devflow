@@ -1,5 +1,11 @@
 # ---- Core (spec-required) ----
-dev:
+free-ports:
+	@echo "Checking and freeing conflicting ports (8000, 8001, 3000, 7860, 5432, 6379)..."
+	@docker --context default stop $$(docker --context default ps -q) 2>/dev/null || true
+	@fuser -k 8000/tcp 8001/tcp 3000/tcp 7860/tcp 5432/tcp 6379/tcp 2>/dev/null || true
+	@sleep 1
+
+dev: free-ports
 	docker compose up --detach --wait
 	@echo "======================================================="
 	@echo "  Devflow is ready in Docker Desktop!"
@@ -9,7 +15,7 @@ dev:
 	@echo "  Langflow UI: http://localhost:7860"
 	@echo "======================================================="
 
-build-dev:
+build-dev: free-ports
 	docker compose up --build --detach --wait
 	@echo "======================================================="
 	@echo "  Devflow is built & ready in Docker Desktop!"
@@ -20,7 +26,7 @@ build-dev:
 	@echo "======================================================="
 
 down:
-	docker compose down
+	docker compose down --remove-orphans
 
 prune:
 	docker system prune -af
