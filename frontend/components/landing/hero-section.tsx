@@ -8,10 +8,18 @@ const TRUST = ['Free to start', 'No credit card required', 'Full SDLC specificat
 
 export function HeroSection() {
   const focusInput = () => {
-    document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth' })
-    setTimeout(() => document.getElementById('idea-input')?.focus(), 600)
+    const target = document.getElementById('plan') ?? document.getElementById('idea-input')
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      window.setTimeout(() => {
+        const input = document.getElementById('idea-input') as HTMLTextAreaElement | null
+        input?.focus()
+      }, 700)
+    } else {
+      window.location.hash = '#plan'
+    }
   }
-  const seePlan = () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })
+  const seePlan = () => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   return (
     <section className="relative px-4 pt-28 sm:pt-32 pb-12">

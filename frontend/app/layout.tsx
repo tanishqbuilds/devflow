@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
-import { ClerkProvider } from '@clerk/nextjs'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -48,6 +47,25 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 }
 
+/**
+ * Only mount ClerkProvider when a publishable key is available AND auth is
+ * not explicitly bypassed. This lets the app build and run inside Docker
+ * without any Clerk credentials.
+ */
+async function MaybeClerkProvider({ children }: { children: React.ReactNode }) {
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH !== 'false'
+  const hasKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+  if (!bypassAuth || !hasKey) {
+    // No Clerk — render children directly.
+    return <>{children}</>
+  }
+
+  // Dynamically import so the module is never evaluated when no key is set.
+  const { ClerkProvider } = await import('@clerk/nextjs')
+  return <ClerkProvider afterSignOutUrl="/">{children}</ClerkProvider>
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -56,9 +74,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background text-foreground">
       <body className="font-sans antialiased bg-background text-foreground min-h-screen">
-        <ClerkProvider afterSignOutUrl="/">
+        <MaybeClerkProvider>
           <AuthProvider>{children}</AuthProvider>
-        </ClerkProvider>
+        </MaybeClerkProvider>
         {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>

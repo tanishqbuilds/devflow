@@ -3,9 +3,8 @@
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
-import { useAppUser } from '@/lib/auth-context'
+import { useAppUser, useAppAuth } from '@/lib/auth-context'
 import { Menu, Search, LogIn, Sparkles, ListChecks, FolderKanban, Cpu } from 'lucide-react'
-import { useClerk } from '@clerk/nextjs'
 
 export function TopNavbar() {
   const {
@@ -18,7 +17,7 @@ export function TopNavbar() {
     setAccountPanelOpen,
   } = useAppStore()
   const { user, isSignedIn, isLoaded } = useAppUser()
-  const { openSignIn } = useClerk()
+  const { signIn } = useAppAuth()
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 px-5 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
@@ -105,7 +104,7 @@ export function TopNavbar() {
             </button>
           ) : (
             <button
-              onClick={() => void openSignIn()}
+              onClick={() => signIn()}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" /> Sign In

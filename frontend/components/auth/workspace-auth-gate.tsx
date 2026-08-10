@@ -1,13 +1,12 @@
 'use client'
 
-import { useClerk } from '@clerk/nextjs'
 import Link from 'next/link'
 import { LogIn, ShieldCheck } from 'lucide-react'
-import { useAppUser } from '@/lib/auth-context'
+import { useAppUser, useAppAuth } from '@/lib/auth-context'
 
 export function WorkspaceAuthGate({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAppUser()
-  const { openSignIn, openSignUp } = useClerk()
+  const { signIn } = useAppAuth()
 
   if (!isLoaded) {
     return <div className="min-h-screen bg-slate-50" />
@@ -26,13 +25,13 @@ export function WorkspaceAuthGate({ children }: { children: React.ReactNode }) {
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
-            onClick={() => void openSignIn()}
+            onClick={() => signIn()}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
           >
             <LogIn className="h-4 w-4" /> Sign In
           </button>
           <button
-            onClick={() => void openSignUp()}
+            onClick={() => signIn()}
             className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Create Account

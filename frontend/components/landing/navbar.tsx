@@ -3,8 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { useAuth, useClerk } from '@clerk/nextjs'
 import Link from 'next/link'
+import { useAppUser, useAppAuth } from '@/lib/auth-context'
 
 const NAV_LINKS = [
   { label: 'How It Works', href: '#how' },
@@ -17,8 +17,8 @@ const NAV_LINKS = [
 export function LandingNavbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { isSignedIn } = useAuth()
-  const { openSignIn } = useClerk()
+  const { isSignedIn } = useAppUser()
+  const { signIn } = useAppAuth()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -80,7 +80,7 @@ export function LandingNavbar() {
             </Link>
           ) : (
             <button
-              onClick={() => void openSignIn()}
+              onClick={() => signIn()}
               className="px-3.5 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
             >
               Sign In
@@ -122,7 +122,7 @@ export function LandingNavbar() {
               <button
                 onClick={() => {
                   setMobileOpen(false)
-                  void openSignIn()
+                  signIn()
                 }}
                 className="mt-2 w-full px-4 py-2.5 text-xs font-semibold text-slate-900 bg-slate-100 rounded-lg cursor-pointer"
               >

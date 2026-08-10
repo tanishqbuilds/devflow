@@ -33,7 +33,7 @@ services:
     ports:
       - "${PORT_BACKEND:-8000}:8000"
     volumes:
-      - ./backend:/app
+      - ./backend:/workspace
     env_file:
       - .env
     environment:
@@ -61,9 +61,10 @@ services:
     ports:
       - "${PORT_AI:-8001}:8001"
     volumes:
-      - ./ai-services:/app
+      - ./ai-services:/workspace
     env_file:
       - .env
+      - ./ai-services/.env
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://devflow:devflow@postgres:5432/devflow}
     depends_on:

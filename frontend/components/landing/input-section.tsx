@@ -4,10 +4,9 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, Wand2 } from 'lucide-react'
-import { useClerk } from '@clerk/nextjs'
 import { analyzeProject } from '@/lib/api'
 import { Reveal } from './reveal'
-import { useAppUser } from '@/lib/auth-context'
+import { useAppUser, useAppAuth } from '@/lib/auth-context'
 
 const EXAMPLES = [
   'AI-powered recruitment platform that screens candidates for startups',
@@ -23,8 +22,8 @@ export function InputSection() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const { isLoaded, isSignedIn, user } = useAppUser()
-  const { openSignIn, redirectToSignIn } = useClerk()
+  const { isLoaded, isSignedIn, user, isClerk } = useAppUser()
+  const { signIn } = useAppAuth()
 
   useEffect(() => {
     if (input) return
@@ -43,19 +42,19 @@ export function InputSection() {
     return () => clearInterval(timer)
   }, [exampleIdx, input])
 
-  if (user?.role === 'developer') {
+  if (isClerk && user?.role === 'developer') {
     return (
-      <section className="relative px-4 py-16 sm:py-20 flex justify-center">
-         <div className="bg-white border border-slate-200 p-8 text-center max-w-md rounded-2xl shadow-sm">
-             <h2 className="text-2xl font-bold text-slate-900">Welcome back!</h2>
-             <p className="text-slate-500 mt-2 text-sm">Head over to your workspace to view your assigned tasks across all projects.</p>
-             <button 
-                onClick={() => router.push('/my-tasks')} 
-                className="mt-6 bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
-             >
-                Go to My Tasks
-             </button>
-         </div>
+      <section id="plan" className="relative px-4 py-16 sm:py-20 flex justify-center scroll-mt-24">
+        <div className="bg-white border border-slate-200 p-8 text-center max-w-md rounded-2xl shadow-sm">
+          <h2 className="text-2xl font-bold text-slate-900">Welcome back!</h2>
+          <p className="text-slate-500 mt-2 text-sm">Head over to your workspace to view your assigned tasks across all projects.</p>
+          <button
+            onClick={() => router.push('/my-tasks')}
+            className="mt-6 bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+          >
+            Go to My Tasks
+          </button>
+        </div>
       </section>
     )
   }
@@ -69,7 +68,7 @@ export function InputSection() {
     }
     if (!isLoaded) return
     if (!isSignedIn) {
-      await redirectToSignIn({ redirectUrl: window.location.href })
+      signIn()
       return
     }
     setSubmitting(true)

@@ -16,6 +16,10 @@ import os
 import httpx
 from openai import AsyncOpenAI
 
+from utils.env import load_runtime_env
+
+load_runtime_env()
+
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
@@ -28,7 +32,20 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
 # Groq is OpenAI-compatible. The repo's .env historically used GROQ_API (no _KEY),
 # so we accept either spelling.
-GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+
+def _normalize_groq_base_url(raw: str | None) -> str:
+    configured = (raw or os.getenv("GROQ_BASE_URL", "https://api.groq.com")).strip().rstrip("/")
+    if not configured:
+        return "https://api.groq.com"
+    if configured.endswith("/openai/v1"):
+        return configured[:-len("/openai/v1")]
+    if configured.endswith("/openai"):
+        return configured[:-len("/openai")]
+    return configured
+
+
+GROQ_BASE_URL = _normalize_groq_base_url(os.getenv("GROQ_BASE_URL"))
+GROQ_OPENAI_BASE_URL = f"{GROQ_BASE_URL}/openai/v1" if not GROQ_BASE_URL.endswith("/openai/v1") else GROQ_BASE_URL
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API", "")
 
 _client: AsyncOpenAI | None = None
@@ -48,7 +65,7 @@ def get_llm_client() -> AsyncOpenAI:
     elif provider == "groq":
         _client = AsyncOpenAI(
             api_key=GROQ_API_KEY or "missing-groq-key",
-            base_url=GROQ_BASE_URL,
+            base_url=GROQ_OPENAI_BASE_URL,
             timeout=timeout,
             max_retries=2,
         )

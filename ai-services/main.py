@@ -3,6 +3,7 @@ import time
 from contextlib import asynccontextmanager
 
 import httpx
+from dotenv import load_dotenv
 import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, status
@@ -12,7 +13,10 @@ from pydantic import BaseModel
 
 from api.routes import router as api_router
 from services.redis_client import close_redis
+from utils.env import load_runtime_env
 from utils.logging import get_logger
+
+load_runtime_env()
 
 logger = get_logger("main")
 

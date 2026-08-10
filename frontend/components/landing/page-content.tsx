@@ -48,11 +48,11 @@ export function LandingPageContent() {
         <LandingNavbar />
         <main>
           <HeroSection />
+          <InputSection />
           <TrustBar />
           <ProblemSection />
           <HowItWorks />
           <AgentsShowcase />
-          <InputSection />
           <FeaturesSection />
           <MigrationSection />
           <SocialProof />

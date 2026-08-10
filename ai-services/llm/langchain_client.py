@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI
 
 from llm.client import (
     GROQ_API_KEY,
-    GROQ_BASE_URL,
+    GROQ_OPENAI_BASE_URL,
     LLM_PROVIDER,
     LLM_TIMEOUT,
     OLLAMA_BASE_URL,
@@ -42,7 +42,7 @@ def get_chat_model(*, model: str, temperature: float, max_tokens: int) -> BaseCh
             return ChatOpenAI(
                 model=model,
                 api_key=GROQ_API_KEY or "missing-groq-key",
-                base_url=GROQ_BASE_URL,
+                base_url=GROQ_OPENAI_BASE_URL,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 timeout=LLM_TIMEOUT,
