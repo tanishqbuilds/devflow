@@ -38,14 +38,16 @@ class ModelConfig:
 # schema (enough to satisfy min-length lists without truncation, which would force a
 # costly retry) while staying lean for free-tier token budgets.
 _PROFILES: dict[str, ModelConfig] = {
-    "ceo": ModelConfig(SMART_MODEL, 0.5, 1100),
-    "product_manager": ModelConfig(SMART_MODEL, 0.4, 2000),
-    "architect": ModelConfig(SMART_MODEL, 0.35, 2000),
-    "sprint_planner": ModelConfig(FAST_MODEL, 0.3, 2600),
-    "risk": ModelConfig(FAST_MODEL, 0.4, 1800),
-    "team_allocation": ModelConfig(FAST_MODEL, 0.4, 1400),
-    "timeline": ModelConfig(SMART_MODEL, 0.35, 1500),
-    "integration": ModelConfig(FAST_MODEL, 0.4, 1400),
+    "ceo": ModelConfig(SMART_MODEL, 0.5, 1000),
+    "product_manager": ModelConfig(SMART_MODEL, 0.4, 1500),
+    "architect": ModelConfig(SMART_MODEL, 0.35, 1600),
+    "sprint_planner": ModelConfig(FAST_MODEL, 0.3, 1600),
+    "risk": ModelConfig(FAST_MODEL, 0.4, 1200),
+    "team_allocation": ModelConfig(FAST_MODEL, 0.4, 1000),
+    "timeline": ModelConfig(SMART_MODEL, 0.35, 1200),
+    "integration": ModelConfig(FAST_MODEL, 0.4, 1000),
+    # CEO supervision review — low temp for objective evaluation.
+    "ceo_review": ModelConfig(SMART_MODEL, 0.2, 700),
 }
 
 

@@ -1,85 +1,156 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useProjectStore } from '@/lib/project-store'
+import { retryProject } from '@/lib/api'
 import {
   Lightbulb,
   Search,
   Network,
   ListChecks,
   ShieldAlert,
-  DollarSign,
+  Users,
   CalendarRange,
   Plug,
   CheckCircle2,
   Loader2,
   AlertCircle,
   Clock,
-  Layers,
-  ArrowRight,
   Terminal,
+  ShieldCheck,
+  Eye,
+  Check,
+  ChevronRight,
+  RotateCw,
 } from 'lucide-react'
 
-interface StageGroup {
+interface AgentStage {
   id: string
-  title: string
-  description: string
-  nodeIds: string[]
+  name: string
+  role: string
+  deliverableKey: string
+  deliverableLabel: string
+  nodeId: string
+  icon: any
 }
 
-const STAGES: StageGroup[] = [
+const ORCHESTRATION_STAGES: { title: string; description: string; agents: AgentStage[] }[] = [
   {
-    id: 'stage-1',
-    title: 'Product Vision',
-    description: 'CEO Agent distills business model & value proposition',
-    nodeIds: ['idea'],
+    title: 'Phase 1: Strategic Direction',
+    description: 'Executive framing, strategic constraints, and scope boundaries',
+    agents: [
+      {
+        id: 'ceo',
+        name: 'CEO Agent',
+        role: 'Chief Vision Officer',
+        deliverableKey: 'executive_summary',
+        deliverableLabel: 'Executive Summary & Decisions',
+        nodeId: 'idea',
+        icon: Lightbulb,
+      },
+    ],
   },
   {
-    id: 'stage-2',
-    title: 'Requirements & Scope',
-    description: 'PM Agent defines user journeys & functional scope',
-    nodeIds: ['requirements'],
+    title: 'Phase 2: Product Specifications',
+    description: 'Functional decomposition, user stories, and acceptance criteria',
+    agents: [
+      {
+        id: 'product_manager',
+        name: 'Product Manager Agent',
+        role: 'Senior Product Manager',
+        deliverableKey: 'requirements',
+        deliverableLabel: 'Requirements & User Stories',
+        nodeId: 'requirements',
+        icon: Search,
+      },
+    ],
   },
   {
-    id: 'stage-3',
-    title: 'System Architecture',
-    description: 'Architect Agent designs data models, APIs & stack',
-    nodeIds: ['architecture'],
+    title: 'Phase 3: System Architecture',
+    description: 'Multi-layer system design, data entities, APIs, and infrastructure',
+    agents: [
+      {
+        id: 'architect',
+        name: 'System Architect Agent',
+        role: 'Principal Architect',
+        deliverableKey: 'architecture',
+        deliverableLabel: 'System Architecture & Data Models',
+        nodeId: 'architecture',
+        icon: Network,
+      },
+    ],
   },
   {
-    id: 'stage-4',
-    title: 'Delivery & Risk Planning',
-    description: 'Sprint Planner, Risk Analyst & VP Engineering',
-    nodeIds: ['tasks', 'risk', 'cost', 'sprint'],
+    title: 'Phase 4: Delivery & Risk Analysis (Parallel)',
+    description: 'Sprint backlog breakdown, risk modeling, and engineering staffing',
+    agents: [
+      {
+        id: 'sprint_planner',
+        name: 'Sprint Planner Agent',
+        role: 'Agile Delivery Lead',
+        deliverableKey: 'backlog',
+        deliverableLabel: 'Epics, Tasks & Story Points',
+        nodeId: 'tasks',
+        icon: ListChecks,
+      },
+      {
+        id: 'risk',
+        name: 'Risk Analyst Agent',
+        role: 'Security & Risk Lead',
+        deliverableKey: 'risks',
+        deliverableLabel: 'Risk & Vulnerability Matrix',
+        nodeId: 'risk',
+        icon: ShieldAlert,
+      },
+      {
+        id: 'team_allocation',
+        name: 'Team Allocation Agent',
+        role: 'VP of Engineering',
+        deliverableKey: 'team',
+        deliverableLabel: 'Staffing & Budget Projections',
+        nodeId: 'cost',
+        icon: Users,
+      },
+    ],
   },
   {
-    id: 'stage-5',
-    title: 'Roadmap & Integration',
-    description: 'Timeline milestones & DevOps CI/CD blueprints',
-    nodeIds: ['execution'],
+    title: 'Phase 5: Roadmap & Platform Integration (Parallel)',
+    description: 'Milestone delivery timeline and DevOps deployment automation',
+    agents: [
+      {
+        id: 'timeline',
+        name: 'Timeline Agent',
+        role: 'Delivery Manager',
+        deliverableKey: 'timeline',
+        deliverableLabel: 'Delivery Schedule & Gates',
+        nodeId: 'execution',
+        icon: CalendarRange,
+      },
+      {
+        id: 'integration',
+        name: 'Integration Agent',
+        role: 'DevOps / Platform Architect',
+        deliverableKey: 'integrations',
+        deliverableLabel: 'CI/CD & Integration Blueprints',
+        nodeId: 'execution',
+        icon: Plug,
+      },
+    ],
   },
 ]
 
-const AGENT_INFO: Record<string, { name: string; role: string; icon: any }> = {
-  idea: { name: 'CEO Agent', role: 'Chief Vision Officer', icon: Lightbulb },
-  requirements: { name: 'Product Manager Agent', role: 'Senior Product Manager', icon: Search },
-  architecture: { name: 'System Architect Agent', role: 'Principal Architect', icon: Network },
-  tasks: { name: 'Sprint Planner Agent', role: 'Agile Delivery Lead', icon: ListChecks },
-  risk: { name: 'Risk Analyst Agent', role: 'Risk & Security Analyst', icon: ShieldAlert },
-  cost: { name: 'Team Allocation Agent', role: 'VP of Engineering', icon: DollarSign },
-  sprint: { name: 'Sprint Board', role: 'Agile Delivery Lead', icon: ListChecks },
-  execution: { name: 'Timeline & Integration', role: 'Delivery & DevOps', icon: Plug },
-}
+const ALL_AGENTS = ORCHESTRATION_STAGES.flatMap((s) => s.agents)
 
-export function OrchestrationLoader() {
+export function OrchestrationLoader({ onDismiss }: { onDismiss?: () => void }) {
   const nodes = useProjectStore((s) => s.nodes)
   const logs = useProjectStore((s) => s.logs)
   const progress = useProjectStore((s) => s.progress)
-  const status = useProjectStore((s) => s.status)
+  const project = useProjectStore((s) => s.project)
   const error = useProjectStore((s) => s.error)
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [isRetrying, setIsRetrying] = useState(false)
   const logsEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -91,203 +162,283 @@ export function OrchestrationLoader() {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  // Determine active node and stage
-  const activeNodeEntry = Object.entries(nodes).find(
-    ([_, n]) => n.status === 'thinking' || n.status === 'analyzing' || n.status === 'generating'
-  )
-  const activeNodeId = activeNodeEntry ? activeNodeEntry[0] : null
-  const activeAgent = activeNodeId ? AGENT_INFO[activeNodeId] || { name: 'Specialist Agent', role: 'Processing', icon: Layers } : null
+  const handleRetry = async () => {
+    if (!project?.id || isRetrying) return
+    setIsRetrying(true)
+    try {
+      await retryProject(project.id)
+    } catch (e) {
+      console.error('Retry failed:', e)
+    } finally {
+      setIsRetrying(false)
+    }
+  }
 
-  // Completed count
-  const completedNodesCount = Object.values(nodes).filter((n) => n.status === 'complete').length
-  const totalNodesCount = Math.max(8, Object.keys(nodes).length)
+  // Count completed deliverables
+  const completedCount = ALL_AGENTS.filter((a) => {
+    const projectAny = project as any
+    return !!projectAny?.[a.deliverableKey] || nodes[a.nodeId]?.status === 'complete'
+  }).length
+
+  // Find current active agent
+  const activeAgent = ALL_AGENTS.find((a) => {
+    const projectAny = project as any
+    const isCompleted = !!projectAny?.[a.deliverableKey]
+    const nodeStatus = nodes[a.nodeId]?.status
+    return !isCompleted && (nodeStatus === 'thinking' || nodeStatus === 'analyzing' || nodeStatus === 'generating')
+  }) || ALL_AGENTS.find((a) => {
+    const projectAny = project as any
+    return !projectAny?.[a.deliverableKey]
+  })
 
   return (
-    <div className="min-h-[82vh] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
-      {/* Header card */}
-      <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+    <div className="py-6 max-w-6xl mx-auto w-full space-y-6">
+      {/* Header Banner */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide mb-3">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Autonomous AI Organization in Progress
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                Orchestration in Progress
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
+                CEO Quality Supervision
+              </span>
+              {(error || completedCount < ALL_AGENTS.length) && (
+                <button
+                  onClick={handleRetry}
+                  disabled={isRetrying}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-medium transition-colors"
+                >
+                  <RotateCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
+                  <span>{isRetrying ? 'Retrying...' : 'Resume / Retry Incomplete'}</span>
+                </button>
+              )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Generating Complete Software Delivery Plan
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {project?.title || 'Compiling Project Specification & Delivery Plan'}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              8 specialist agents are collaborating, cross-validating requirements, and compiling production specifications.
+            <p className="text-slate-500 text-sm mt-1 max-w-2xl">
+              Specialist agents are evaluating requirements, designing system architecture, and building delivery roadmaps.
             </p>
           </div>
 
-          <div className="flex items-center gap-6 bg-slate-50 border border-slate-200/80 rounded-xl px-5 py-3.5 self-start sm:self-auto">
+          {/* Key Metrics */}
+          <div className="flex items-center gap-5 bg-slate-50 border border-slate-200/80 rounded-lg px-4 py-3 self-start sm:self-auto">
             <div>
-              <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Progress</div>
-              <div className="text-2xl font-bold text-slate-900">{progress}%</div>
+              <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Progress</div>
+              <div className="text-xl font-bold text-slate-900">{progress}%</div>
             </div>
-            <div className="h-8 w-px bg-slate-200" />
+            <div className="h-7 w-px bg-slate-200" />
             <div>
-              <div className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="w-3 h-3" /> Elapsed
+              <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-400" /> Elapsed
               </div>
-              <div className="text-sm font-semibold text-slate-700 mt-1">
+              <div className="text-xs font-semibold text-slate-800 mt-0.5 font-mono">
                 {Math.floor(elapsedSeconds / 60)}m {elapsedSeconds % 60}s
+              </div>
+            </div>
+            <div className="h-7 w-px bg-slate-200" />
+            <div>
+              <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Completed</div>
+              <div className="text-xs font-semibold text-slate-800 mt-0.5">
+                {completedCount} / {ALL_AGENTS.length}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Global Progress Bar */}
-        <div className="mt-6">
+        {/* Progress Bar */}
+        <div className="mt-5">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
-            <span>Orchestration Pipeline</span>
-            <span>{completedNodesCount} of {totalNodesCount} Agent Deliverables Complete</span>
+            <span>Pipeline Status</span>
+            <span>{completedCount === ALL_AGENTS.length ? 'Finalizing Quality Review' : `${completedCount} of ${ALL_AGENTS.length} Deliverables Generated`}</span>
           </div>
-          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
             <motion.div
               className="h-full bg-blue-600 rounded-full"
-              initial={{ width: 0 }}
+              initial={{ width: '5%' }}
               animate={{ width: `${Math.max(5, progress)}%` }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
             />
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Pipeline Stepper + Live Logs */}
+      {/* Main Content Grid: Orchestration Phases + Real-time Activity Log */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-        {/* Left column: 5-Stage Stepper */}
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-          <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-5 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-blue-600" />
-            Execution Stages
-          </h2>
+        {/* Left Column (7 cols): Execution Phases */}
+        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-4">
+              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                Orchestration Stages & Agents
+              </h2>
+              <span className="text-xs text-slate-400 font-medium">8 Specialist Roles</span>
+            </div>
 
-          <div className="space-y-4">
-            {STAGES.map((stage, idx) => {
-              const stageNodes = stage.nodeIds.map((id) => nodes[id])
-              const isStageComplete = stageNodes.length > 0 && stageNodes.every((n) => n?.status === 'complete')
-              const isStageActive = stageNodes.some(
-                (n) => n?.status === 'thinking' || n?.status === 'analyzing' || n?.status === 'generating'
-              )
+            <div className="space-y-4">
+              {ORCHESTRATION_STAGES.map((stage, stageIdx) => {
+                const isStageComplete = stage.agents.every((a) => {
+                  const projectAny = project as any
+                  return !!projectAny?.[a.deliverableKey] || nodes[a.nodeId]?.status === 'complete'
+                })
+                const isStageActive = stage.agents.some((a) => {
+                  const projectAny = project as any
+                  const isDone = !!projectAny?.[a.deliverableKey]
+                  const st = nodes[a.nodeId]?.status
+                  return !isDone && (st === 'thinking' || st === 'analyzing' || st === 'generating' || activeAgent?.id === a.id)
+                })
 
-              return (
-                <div
-                  key={stage.id}
-                  className={`p-4 rounded-xl border transition-all duration-200 ${
-                    isStageActive
-                      ? 'bg-blue-50/50 border-blue-200 shadow-sm'
-                      : isStageComplete
-                      ? 'bg-slate-50/70 border-slate-200/80'
-                      : 'bg-white border-slate-200/60 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-start gap-3.5">
-                    <div className="mt-0.5">
-                      {isStageComplete ? (
-                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                          <CheckCircle2 className="w-4 h-4" />
+                return (
+                  <div
+                    key={stage.title}
+                    className={`rounded-lg border p-3.5 transition-colors ${
+                      isStageActive
+                        ? 'bg-blue-50/30 border-blue-200'
+                        : isStageComplete
+                        ? 'bg-slate-50/60 border-slate-200'
+                        : 'bg-white border-slate-200/60 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-semibold ${
+                          isStageComplete
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : isStageActive
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          {isStageComplete ? <Check className="w-3 h-3" /> : stageIdx + 1}
                         </div>
-                      ) : isStageActive ? (
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-semibold">
-                          {idx + 1}
-                        </div>
+                        <span className="text-xs font-bold text-slate-800">{stage.title}</span>
+                      </div>
+                      {isStageComplete && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          Complete
+                        </span>
+                      )}
+                      {isStageActive && (
+                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1">
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" /> In Progress
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className={`text-sm font-semibold ${isStageActive ? 'text-blue-950' : 'text-slate-900'}`}>
-                          {stage.title}
-                        </h3>
-                        {isStageComplete && (
-                          <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            Done
-                          </span>
-                        )}
-                        {isStageActive && (
-                          <span className="text-[11px] font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200 animate-pulse">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{stage.description}</p>
+                    {/* Agent Cards within this stage */}
+                    <div className="space-y-1.5 mt-2.5 pl-7">
+                      {stage.agents.map((agent) => {
+                        const projectAny = project as any
+                        const isAgentDone = !!projectAny?.[agent.deliverableKey] || nodes[agent.nodeId]?.status === 'complete'
+                        const isAgentActive = !isAgentDone && (nodes[agent.nodeId]?.status === 'thinking' || activeAgent?.id === agent.id)
+
+                        return (
+                          <div
+                            key={agent.id}
+                            className={`flex items-center justify-between py-1.5 px-2.5 rounded text-xs border ${
+                              isAgentActive
+                                ? 'bg-white border-blue-300 font-medium text-blue-900 shadow-xs'
+                                : isAgentDone
+                                ? 'bg-white/80 border-slate-200/80 text-slate-700'
+                                : 'bg-slate-50/50 border-slate-200/50 text-slate-400'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <agent.icon className={`w-3.5 h-3.5 ${isAgentDone ? 'text-emerald-600' : isAgentActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                              <span className="font-semibold">{agent.name}</span>
+                              <span className="text-slate-400 text-[11px]">({agent.role})</span>
+                            </div>
+                            <div className="text-[11px] font-mono">
+                              {isAgentDone ? (
+                                <span className="text-emerald-600 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" /> Ready
+                                </span>
+                              ) : isAgentActive ? (
+                                <span className="text-blue-600 flex items-center gap-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Processing
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">Pending</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
 
-          {/* Active Agent Highlight Card */}
-          {activeAgent && (
-            <div className="mt-6 p-4 rounded-xl bg-slate-900 text-white shadow-md border border-slate-800 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center">
-                  <activeAgent.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400 font-medium">Currently Reasoning</div>
-                  <div className="text-sm font-bold text-white">{activeAgent.name}</div>
-                  <div className="text-xs text-blue-300">{activeAgent.role}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium text-blue-400 bg-blue-950/80 px-3 py-1.5 rounded-lg border border-blue-800">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Calling Groq LLM
-              </div>
+          {onDismiss && (
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Orchestration continues in background</span>
+              <button
+                onClick={onDismiss}
+                className="text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1 hover:underline"
+              >
+                <span>View workspace preview</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
         </div>
 
-        {/* Right column: Live Activity Feed */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 flex flex-col h-[520px]">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-3">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-slate-700" />
-              Live Activity Stream
-            </h2>
-            <span className="text-xs text-slate-400 font-mono">{logs.length} events</span>
+        {/* Right Column (5 cols): Activity Audit Log */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-[620px]">
+          <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 mb-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-slate-500" />
+              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Live Execution Feed
+              </h2>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {logs.length} entries
+            </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs font-mono">
+          {/* Log Stream */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[11px]">
             {logs.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center p-6">
-                <Loader2 className="w-6 h-6 animate-spin mb-2 text-slate-300" />
-                <p>Waiting for initial agent events...</p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-300 mb-2" />
+                <p className="text-xs">Initializing orchestration pipeline...</p>
               </div>
             ) : (
               logs.map((log, i) => {
                 const isError = log.level === 'error'
-                const isSuccess = log.message.includes('complete') || log.message.includes('✓')
+                const isWarning = log.level === 'warning'
+                const isSuccess = log.message.includes('complete') || log.message.includes('✓') || log.message.includes('Passed')
 
                 return (
-                  <motion.div
+                  <div
                     key={i}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-2.5 rounded-lg border leading-relaxed ${
+                    className={`p-2 rounded border leading-relaxed ${
                       isError
                         ? 'bg-rose-50 border-rose-200 text-rose-800'
+                        : isWarning
+                        ? 'bg-amber-50 border-amber-200 text-amber-800'
                         : isSuccess
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-                        : 'bg-slate-50 border-slate-200/70 text-slate-700'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                      <span className="font-semibold text-slate-600 uppercase tracking-wide">
-                        {log.agent || 'System'}
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                      <span className="font-semibold uppercase text-slate-600">
+                        {log.agent ? `${log.agent}` : 'System'}
                       </span>
                       <span>
-                        {log.ts ? new Date(log.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {log.ts ? new Date(log.ts).toLocaleTimeString() : new Date().toLocaleTimeString()}
                       </span>
                     </div>
                     <div>{log.message}</div>
-                  </motion.div>
+                  </div>
                 )
               })
             )}
@@ -295,9 +446,19 @@ export function OrchestrationLoader() {
           </div>
 
           {error && (
-            <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="mt-3 p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-750 text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
+                <span className="line-clamp-2 text-rose-800">{error}</span>
+              </div>
+              <button
+                onClick={handleRetry}
+                disabled={isRetrying}
+                className="flex-shrink-0 px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium text-[11px] transition-colors flex items-center gap-1"
+              >
+                <RotateCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
+                <span>Retry</span>
+              </button>
             </div>
           )}
         </div>

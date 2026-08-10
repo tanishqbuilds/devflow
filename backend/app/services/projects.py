@@ -121,6 +121,14 @@ async def apply_event(project_id: str, event: dict[str, Any]) -> None:
         doc["progress"] = event.get("progress", 0)
     elif etype == "error":
         doc["error"] = event.get("message")
+    elif etype == "supervisor_review":
+        await add_ai_response(
+            project_id, doc["user_id"], "supervisor_review", payload=event
+        )
+    elif etype == "supervisor_directive":
+        await add_ai_response(
+            project_id, doc["user_id"], "supervisor_directive", payload=event
+        )
     else:
         return
     doc["updated_at"] = now

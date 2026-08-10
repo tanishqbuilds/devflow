@@ -75,10 +75,22 @@ async def run_agent(agent_id: str, req: AgentRunRequest) -> dict[str, Any]:
     return {"agent": agent_id, "node": agent.node, "data": data}
 
 
-async def _run_workflow(project_id: str, idea: str, title: str | None) -> None:
+class WorkflowRetryRequest(BaseModel):
+    project_id: str
+    idea: str | None = None
+    title: str | None = None
+    target_agents: list[str] | None = None
+
+
+async def _run_workflow(
+    project_id: str,
+    idea: str,
+    title: str | None,
+    target_agents: list[str] | None = None,
+) -> None:
     engine = WorkflowEngine(get_redis(), project_id)
     try:
-        await engine.run(idea, title)
+        await engine.run(idea, title, only_missing=True, target_agents=target_agents)
     except Exception:
         logger.exception("Workflow crashed for project %s", project_id)
 
@@ -89,6 +101,16 @@ async def run_workflow(req: WorkflowRunRequest) -> dict[str, Any]:
     _BACKGROUND_TASKS.add(task)
     task.add_done_callback(_BACKGROUND_TASKS.discard)
     logger.info("Workflow accepted for project %s", req.project_id)
+    return {"status": "started", "project_id": req.project_id}
+
+
+@router.post("/workflow/retry")
+async def retry_workflow(req: WorkflowRetryRequest) -> dict[str, Any]:
+    idea = req.idea or ""
+    task = asyncio.create_task(_run_workflow(req.project_id, idea, req.title, req.target_agents))
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    logger.info("Workflow retry queued for project %s", req.project_id)
     return {"status": "started", "project_id": req.project_id}
 
 

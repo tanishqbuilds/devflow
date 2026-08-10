@@ -49,7 +49,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -64,7 +64,6 @@ services:
       - ./ai-services:/workspace
     env_file:
       - .env
-      - ./ai-services/.env
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql://devflow:devflow@postgres:5432/devflow}
     depends_on:
@@ -76,7 +75,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"]
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -98,7 +97,7 @@ services:
       - langflow_data:/root/.cache/langflow
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7860/health_check').status==200 else 1)"]
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7860/health_check').status==200 else 1)"]
       interval: 15s
       timeout: 5s
       retries: 5

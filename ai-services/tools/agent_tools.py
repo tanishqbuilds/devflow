@@ -25,6 +25,12 @@ from tools.knowledge_databases import (
     DEVOPS_INTEGRATION_CATALOG,
     SECURITY_RISK_CATALOG,
 )
+from tools.text_tools import (
+    extract_key_decisions,
+    normalize_output_text,
+    summarize_for_context,
+    validate_json_structure,
+)
 
 # ============================================================================
 # CEO Tools
@@ -171,18 +177,31 @@ def get_devops_blueprints() -> str:
 
 
 # ============================================================================
-# Agent-to-Tools Registry Map (Domain Tools + Inter-Agent Calling)
+# Shared text processing tools (available to all agents)
+# ============================================================================
+_TEXT_TOOLS = [
+    summarize_for_context,
+    normalize_output_text,
+    extract_key_decisions,
+    validate_json_structure,
+]
+
+
+# ============================================================================
+# Agent-to-Tools Registry Map (Domain Tools + Inter-Agent Calling + Text Tools)
 # ============================================================================
 AGENT_SPECIALIST_TOOLS: dict[str, list[Any]] = {
     "ceo": [
         evaluate_market_and_business_model,
         consult_product_manager,
         consult_system_architect,
+        *_TEXT_TOOLS,
     ],
     "product_manager": [
         calculate_feature_prioritization,
         consult_system_architect,
         consult_risk_analyst,
+        *_TEXT_TOOLS,
     ],
     "architect": [
         lookup_architecture_stack,
@@ -190,31 +209,37 @@ AGENT_SPECIALIST_TOOLS: dict[str, list[Any]] = {
         consult_risk_analyst,
         consult_integration_agent,
         consult_product_manager,
+        *_TEXT_TOOLS,
     ],
     "sprint_planner": [
         estimate_sprint_velocity,
         consult_system_architect,
         consult_team_allocation,
+        *_TEXT_TOOLS,
     ],
     "risk": [
         lookup_security_threats,
         consult_system_architect,
         consult_integration_agent,
+        *_TEXT_TOOLS,
     ],
     "team_allocation": [
         get_role_compensation_card,
         consult_sprint_planner,
         consult_system_architect,
+        *_TEXT_TOOLS,
     ],
     "timeline": [
         calculate_critical_path_schedule,
         consult_sprint_planner,
         consult_team_allocation,
+        *_TEXT_TOOLS,
     ],
     "integration": [
         get_devops_blueprints,
         consult_system_architect,
         consult_risk_analyst,
+        *_TEXT_TOOLS,
     ],
 }
 

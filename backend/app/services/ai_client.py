@@ -29,6 +29,17 @@ class AIServicesClient:
             resp.raise_for_status()
             return resp.json()
 
+    async def retry_workflow(
+        self, project_id: str, idea: str, title: Optional[str] = None, target_agents: Optional[list[str]] = None
+    ) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{self._base_url}/workflow/retry",
+                json={"project_id": project_id, "idea": idea, "title": title, "target_agents": target_agents},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
     async def chat(
         self, project: dict[str, Any], message: str, history: list[dict[str, str]]
     ) -> dict[str, Any]:

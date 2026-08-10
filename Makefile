@@ -1,9 +1,18 @@
-# ---- Core (spec-required) ----
-free-ports:
-	@echo "Checking and freeing conflicting ports (8000, 8001, 3000, 7860, 5432, 6379)..."
-	@python scripts/free_ports.py
+.PHONY: help dev build-dev up down restart ps logs health prune frontend-dev backend ai langflow postgres redis
 
-dev: free-ports
+help:
+	@echo "Devflow Management Commands:"
+	@echo "  make dev          - Start all containers in background"
+	@echo "  make build-dev    - Rebuild and start all containers in background"
+	@echo "  make up           - Alias for make dev"
+	@echo "  make down         - Stop and remove all containers"
+	@echo "  make logs         - Tail logs from all containers"
+	@echo "  make ps           - List status of all containers"
+	@echo "  make health       - Check health endpoints of running services"
+	@echo "  make restart      - Restart all services"
+	@echo "  make prune        - Clean up unused Docker resources"
+
+dev:
 	docker compose up --detach --wait
 	@echo "======================================================="
 	@echo "  Devflow is ready in Docker Desktop!"
@@ -13,7 +22,7 @@ dev: free-ports
 	@echo "  Langflow UI: http://localhost:7860"
 	@echo "======================================================="
 
-build-dev: free-ports
+build-dev:
 	docker compose up --build --detach --wait
 	@echo "======================================================="
 	@echo "  Devflow is built & ready in Docker Desktop!"
@@ -22,6 +31,8 @@ build-dev: free-ports
 	@echo "  AI Services: http://localhost:8001/docs"
 	@echo "  Langflow UI: http://localhost:7860"
 	@echo "======================================================="
+
+up: dev
 
 down:
 	docker compose down --remove-orphans
@@ -44,11 +55,11 @@ ps:
 
 health:
 	@echo "--- Backend Health ---"
-	@curl -s http://localhost:8000/health | python3 -m json.tool || true
-	@echo "--- AI Services Health ---"
-	@curl -s http://localhost:8001/health | python3 -m json.tool || true
-	@echo "--- Langflow Health ---"
-	@curl -s http://localhost:7860/health || true
+	@curl -sf http://localhost:8000/health | python3 -m json.tool 2>/dev/null || curl -sf http://localhost:8000/health || echo "Backend unreachable"
+	@echo "\n--- AI Services Health ---"
+	@curl -sf http://localhost:8001/health | python3 -m json.tool 2>/dev/null || curl -sf http://localhost:8001/health || echo "AI Services unreachable"
+	@echo "\n--- Langflow Health ---"
+	@curl -sf http://localhost:7860/health || echo "Langflow unreachable"
 
 frontend-dev:      ## Run Next.js locally on :3000
 	cd frontend && npm run dev -- -p 3000

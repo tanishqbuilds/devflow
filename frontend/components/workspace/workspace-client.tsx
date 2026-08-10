@@ -20,7 +20,7 @@ import { DocumentationView } from './documentation-view'
 import { OrchestrationLoader } from './orchestration-loader'
 
 export function WorkspaceClient() {
-  const { activeWorkspaceMode, setProjectTitle, setProjectDescription } = useAppStore()
+  const { activeWorkspaceMode, setActiveWorkspaceMode, setProjectTitle, setProjectDescription } = useAppStore()
   const setProjectId = useProjectStore((s) => s.setProjectId)
   const reset = useProjectStore((s) => s.reset)
   const status = useProjectStore((s) => s.status)
@@ -28,12 +28,9 @@ export function WorkspaceClient() {
 
   const projectId = useSearchParams().get('project')
 
-  const [dismissed, setDismissed] = useState(false)
-
   useEffect(() => {
     reset()
     setProjectId(projectId)
-    setDismissed(false)
   }, [projectId, reset, setProjectId])
 
   useOrchestrationStream(projectId)
@@ -46,18 +43,10 @@ export function WorkspaceClient() {
     if (desc) setProjectDescription(desc)
   }, [project, setProjectTitle, setProjectDescription])
 
-  useEffect(() => {
-    if (status === 'complete' || status === 'failed') {
-      const t = setTimeout(() => setDismissed(true), 1400)
-      return () => clearTimeout(t)
-    }
-  }, [status])
-
-  const isRunning = status === 'idle' || status === 'queued' || status === 'running'
-  const showLoader = !!projectId && !dismissed && isRunning
-
   const renderView = () => {
     switch (activeWorkspaceMode) {
+      case 'track-live':
+        return <OrchestrationLoader onDismiss={() => setActiveWorkspaceMode('overview')} />
       case 'overview':
         return <OverviewView />
       case 'insights':
@@ -91,8 +80,7 @@ export function WorkspaceClient() {
   }
 
   return (
-    <div>
-      {showLoader && <OrchestrationLoader />}
+    <div className="w-full">
       {renderView()}
     </div>
   )

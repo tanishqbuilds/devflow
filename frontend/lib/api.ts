@@ -63,6 +63,16 @@ export async function analyzeProject(
   return jsonOrThrow(res)
 }
 
+export async function retryProject(
+  projectId: string,
+): Promise<{ project_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}/retry`, {
+    method: 'POST',
+    headers: await authHeaders(true),
+  })
+  return jsonOrThrow(res)
+}
+
 export type MigrationSource = 'spec' | 'file' | 'repo' | 'tickets'
 
 /**

@@ -18,6 +18,12 @@ RUN uv sync --no-install-project --no-dev
 
 COPY . .
 
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
+    && chown -R appuser:appuser /app /opt/venv
+
+USER appuser
+
 EXPOSE 8001
 
 CMD ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]

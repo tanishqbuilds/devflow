@@ -35,6 +35,16 @@ class ExecutiveSummary(BaseModel):
     success_criteria: List[str] = Field(..., min_length=2)
     target_users: List[str] = Field(..., min_length=1)
     key_differentiators: List[str] = Field(..., min_length=1)
+    competitive_landscape: str = Field(
+        default="", description="Brief analysis of competitive landscape and positioning"
+    )
+    go_to_market: str = Field(
+        default="", description="High-level go-to-market strategy or launch approach"
+    )
+    key_decisions: List[str] = Field(
+        default_factory=list,
+        description="Binding strategic decisions downstream agents must respect",
+    )
     complexity_score: int = Field(..., ge=1, le=100, description="1=trivial, 100=extreme")
     complexity_label: Literal["Low", "Moderate", "High", "Very High"]
     estimated_duration_weeks: int = Field(..., ge=1, le=260)
@@ -49,13 +59,24 @@ class RequirementItem(BaseModel):
     category: RequirementCategory
     description: str
     priority: Priority = "medium"
+    estimated_effort_days: float = Field(
+        default=1.0, ge=0.5, le=60,
+        description="Rough effort estimate in developer-days",
+    )
+    depends_on: List[str] = Field(
+        default_factory=list,
+        description="Titles of other requirements this one depends on",
+    )
 
 
 class UserStory(BaseModel):
     as_a: str = Field(..., description="The user role / persona")
     i_want: str = Field(..., description="The capability desired")
     so_that: str = Field(..., description="The value / outcome")
-    acceptance_criteria: List[str] = Field(..., min_length=1)
+    acceptance_criteria: List[str] = Field(
+        ..., min_length=1,
+        description="Testable criteria, ideally in Given/When/Then format",
+    )
     priority: Priority = "medium"
 
 
@@ -75,6 +96,10 @@ class ArchitectureLayer(BaseModel):
     components: List[str] = Field(..., min_length=2)
     technologies: List[str] = Field(..., min_length=1)
     decisions: List[str] = Field(default_factory=list)
+    key_entities: List[str] = Field(
+        default_factory=list,
+        description="Primary data models or API endpoints relevant to this layer",
+    )
 
 
 class ArchitectureBundle(BaseModel):
@@ -101,9 +126,17 @@ class TaskItem(BaseModel):
     category: str = Field(..., description="e.g. frontend, backend, infra, ai, qa")
     epic: str = Field(default="", description="Title of the parent epic")
     estimated_days: float = Field(..., ge=0.5, le=60)
+    story_points: int = Field(
+        default=3, ge=1, le=13,
+        description="Fibonacci story points: 1, 2, 3, 5, 8, 13",
+    )
     priority: Priority = "medium"
     sprint: int = Field(default=1, ge=1)
     dependencies: List[str] = Field(default_factory=list, description="Titles of prerequisite tasks")
+    definition_of_done: str = Field(
+        default="",
+        description="Specific criteria for marking this task complete",
+    )
 
 
 class Sprint(BaseModel):
@@ -132,6 +165,14 @@ class RiskItem(BaseModel):
     probability: int = Field(..., ge=0, le=100)
     impact: int = Field(..., ge=0, le=100)
     mitigation: str
+    cost_of_delay_per_week: str = Field(
+        default="",
+        description="Estimated business cost if this risk materializes and is unaddressed per week",
+    )
+    compounds_with: List[str] = Field(
+        default_factory=list,
+        description="Titles of other risks this one amplifies or is amplified by",
+    )
 
 
 class RiskBundle(BaseModel):
@@ -150,6 +191,14 @@ class TeamMember(BaseModel):
     skills: List[str] = Field(..., min_length=1)
     responsibilities: List[str] = Field(..., min_length=1)
     allocation_pct: int = Field(default=100, ge=10, le=100)
+    owns_area: str = Field(
+        default="",
+        description="The architecture layer or backlog area this role primarily owns",
+    )
+    onboarding_weeks: int = Field(
+        default=2, ge=1, le=12,
+        description="Estimated onboarding ramp-up time in weeks",
+    )
 
 
 class TeamPlan(BaseModel):
@@ -169,6 +218,10 @@ class MilestoneItem(BaseModel):
     duration_weeks: int = Field(..., ge=1, le=104)
     deliverables: List[str] = Field(..., min_length=1)
     dependencies: List[str] = Field(default_factory=list)
+    go_no_go_criteria: List[str] = Field(
+        default_factory=list,
+        description="Criteria that must be met before transitioning to the next phase",
+    )
 
 
 class TimelinePlan(BaseModel):
@@ -185,12 +238,44 @@ class IntegrationItem(BaseModel):
     category: IntegrationCategory
     purpose: str
     steps: List[str] = Field(..., min_length=1)
+    auth_method: str = Field(
+        default="",
+        description="Authentication method (e.g. OAuth2, API Key, JWT, Webhook Secret)",
+    )
+    rollback_steps: List[str] = Field(
+        default_factory=list,
+        description="Steps to safely rollback or disable this integration",
+    )
 
 
 class IntegrationBundle(BaseModel):
     integrations: List[IntegrationItem] = Field(..., min_length=2)
     deployment_plan: List[str] = Field(..., min_length=2)
     cicd_recommendations: List[str] = Field(..., min_length=1)
+
+
+# --------------------------------------------------------------------------- #
+# CEO Supervision — Review Schema
+# --------------------------------------------------------------------------- #
+class SupervisionDirective(BaseModel):
+    agent_id: str = Field(..., description="The agent that needs to re-run")
+    reason: str = Field(..., description="Specific issue the agent must address")
+    priority: Priority = "high"
+
+
+class CEOReview(BaseModel):
+    passed: bool = Field(
+        ..., description="True if the collective output is coherent and production-ready"
+    )
+    overall_assessment: str = Field(
+        ..., description="1-3 sentence summary of the overall plan quality"
+    )
+    strengths: List[str] = Field(default_factory=list)
+    weaknesses: List[str] = Field(default_factory=list)
+    directives: List[SupervisionDirective] = Field(
+        default_factory=list,
+        description="Agents that should re-run with targeted feedback (empty if passed)",
+    )
 
 
 # Registry of agent_id -> output schema, used by the workflow engine and tests.

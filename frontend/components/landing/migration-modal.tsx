@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { X, FileText, Upload, GitBranch, ArrowRight, Loader2 } from 'lucide-react'
 import { migrateProject, type MigrationSource } from '@/lib/api'
 import { useAppAuth, useAppUser } from '@/lib/auth-context'
+import { useAppStore } from '@/lib/store'
 
 const TABS: { id: MigrationSource; label: string; icon: any }[] = [
   { id: 'spec', label: 'Paste Spec / Tickets', icon: FileText },
@@ -61,6 +62,7 @@ export function MigrationModal({ open, onClose }: { open: boolean; onClose: () =
     try {
       const { project_id } = await migrateProject({ source: tab, content })
       onClose()
+      useAppStore.getState().setActiveWorkspaceMode('track-live')
       router.push(`/workspace?project=${project_id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Migration failed.')

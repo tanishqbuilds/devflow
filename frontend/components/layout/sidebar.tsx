@@ -3,7 +3,9 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore, type WorkspaceMode } from '@/lib/store'
+import { useProjectStore } from '@/lib/project-store'
 import {
+  Activity,
   LayoutDashboard,
   FileText,
   Network,
@@ -17,6 +19,7 @@ import {
   Sparkles,
   BookOpen,
   Settings,
+  Loader2,
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -31,6 +34,12 @@ interface SidebarGroup {
 }
 
 const groups: SidebarGroup[] = [
+  {
+    label: 'Live AI Org',
+    items: [
+      { mode: 'track-live', label: 'Track Live', icon: <Activity /> },
+    ],
+  },
   {
     label: 'Plan',
     items: [
@@ -67,6 +76,8 @@ const groups: SidebarGroup[] = [
 
 export function Sidebar() {
   const { sidebarCollapsed, activeWorkspaceMode, setActiveWorkspaceMode } = useAppStore()
+  const status = useProjectStore((s) => s.status)
+  const progress = useProjectStore((s) => s.progress)
 
   return (
     <aside
@@ -86,24 +97,37 @@ export function Sidebar() {
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = activeWorkspaceMode === item.mode
+                  const isTrackLive = item.mode === 'track-live'
+                  const isRunning = isTrackLive && (status === 'running' || status === 'queued')
+
                   return (
                     <button
                       key={item.mode}
                       onClick={() => setActiveWorkspaceMode(item.mode)}
                       title={item.label}
-                      className={`w-full px-3 py-2 rounded-lg transition-all flex items-center gap-2.5 text-left text-xs font-medium ${
+                      className={`w-full px-3 py-2 rounded-lg transition-all flex items-center justify-between text-left text-xs font-medium ${
                         active
                           ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-100 shadow-xs'
+                          : isRunning
+                          ? 'bg-blue-50/40 text-blue-800 font-semibold border border-blue-200/60'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                       }`}
                     >
-                      <span className="flex-shrink-0">
-                        {React.cloneElement(item.icon, {
-                          className: `w-4 h-4 transition-colors ${active ? 'text-blue-600' : 'text-slate-500'}`,
-                        })}
-                      </span>
-                      {!sidebarCollapsed && (
-                        <span className="whitespace-nowrap overflow-hidden truncate">{item.label}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex-shrink-0">
+                          {React.cloneElement(item.icon, {
+                            className: `w-4 h-4 transition-colors ${active || isRunning ? 'text-blue-600' : 'text-slate-500'}`,
+                          })}
+                        </span>
+                        {!sidebarCollapsed && (
+                          <span className="whitespace-nowrap overflow-hidden truncate">{item.label}</span>
+                        )}
+                      </div>
+                      {!sidebarCollapsed && isRunning && (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          <span>{progress}%</span>
+                        </span>
                       )}
                     </button>
                   )

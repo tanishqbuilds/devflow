@@ -41,6 +41,18 @@ async def migrate(req: MigrateRequest, user: CurrentUser = Depends(current_user)
     return AnalyzeResponse(project_id=doc["id"], status="queued")
 
 
+@router.post("/{project_id}/retry", response_model=AnalyzeResponse, status_code=202)
+async def retry_project(project_id: str, user: CurrentUser = Depends(current_user)) -> AnalyzeResponse:
+    """Retry all failed or incomplete sections for a project without losing already completed deliverables."""
+    doc = await project_service.get_project(project_id, user.id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="project not found")
+    await project_service.set_status(project_id, "queued", progress=doc.get("progress", 0), error=None)
+    await enqueue_analysis(project_id)
+    logger.info("Enqueued retry for project %s", project_id)
+    return AnalyzeResponse(project_id=project_id, status="queued")
+
+
 @router.post("/{project_id}/chat")
 async def chat(
     project_id: str, req: ChatRequest, user: CurrentUser = Depends(current_user)

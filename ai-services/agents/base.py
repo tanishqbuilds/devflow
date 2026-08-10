@@ -30,15 +30,16 @@ class Agent:
     system_prompt: str
     build_user_prompt: Callable[[dict[str, Any]], str]
 
-    async def run(self, ctx: dict[str, Any]) -> dict[str, Any]:
+    async def run(self, ctx: dict[str, Any], directive: str | None = None) -> dict[str, Any]:
         """Execute the agent against the project context, returning a plain dict."""
         started = time.time()
-        logger.info("▶ %s (%s) starting", self.name, self.id)
+        logger.info("▶ %s (%s) starting%s", self.name, self.id, f" with directive: {directive[:60]}" if directive else "")
         graph = build_agent_graph(
             agent_id=self.id,
             system_prompt=self.system_prompt,
             schema=self.schema,
             model_config=resolve(self.id),
+            directive=directive,
         )
         state = await graph.ainvoke(
             {"context": ctx, "user_prompt": self.build_user_prompt(ctx)}

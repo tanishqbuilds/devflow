@@ -1,13 +1,14 @@
 """The Devflow workflow engine.
 
-Implements the orchestration graph:
+Implements the orchestration graph with outer CEO supervision:
 
     CEO -> Product Manager -> Architect -> [Sprint Planner | Risk | Team Allocation]
                                         -> [Timeline | Integration]
+                                        -> CEO Supervisor Evaluation -> [Re-runs if needed]
 
 Stages run sequentially; agents *within* a stage run in parallel. The engine
-tracks per-node state and overall progress, loads prior database versions
-for iterations, emits events throughout, and records versioned iteration snapshots.
+tracks per-node state, saves structured per-agent JSON snapshots, emits events throughout,
+and runs the CEO supervisor loop to guarantee output quality.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from services.cost import compute_cost
 from services.diagram import build_diagram, build_mermaid
 from utils.logging import get_logger
 from workflows.events import EventEmitter
+from workflows.supervisor import CEOSupervisor
 
 logger = get_logger("workflow.engine")
 
@@ -68,44 +70,79 @@ class WorkflowEngine:
         self._memory = ProjectMemory(project_id, user_id)
         self._ctx: dict[str, Any] = {}
         self._completed_units = 0
+        self._agent_versions: dict[str, int] = {}
+        self._supervisor = CEOSupervisor(self._emitter, project_id, self._run_agent)
 
-    async def _run_agent(self, agent_id: str) -> None:
+    async def _run_agent(
+        self, agent_id: str, directive: str | None = None, max_attempts: int = 3
+    ) -> bool:
         agent = get_agent(agent_id)
         node = agent.node
         section = SECTION_OF[agent_id]
-        try:
-            await self._emitter.node_update(node, "thinking", 20, agent.name)
-            await self._emitter.log(agent_id, f"{agent.name}: {_WORKING_MSG.get(agent_id, 'working...')}")
+        version = self._agent_versions.get(agent_id, 0) + 1
+        self._agent_versions[agent_id] = version
 
-            data = await agent.run(self._ctx)
-            self._ctx[section] = data
+        for attempt in range(1, max_attempts + 1):
+            try:
+                await self._emitter.node_update(node, "thinking", 20, agent.name)
+                msg = _WORKING_MSG.get(agent_id, "working...")
+                if directive:
+                    msg = f"Addressing CEO directive: {directive[:80]}..."
+                elif attempt > 1:
+                    msg = f"Retrying ({attempt}/{max_attempts})..."
+                await self._emitter.log(agent_id, f"{agent.name}: {msg}")
 
-            # Derived artifacts.
-            if agent_id == "architect":
-                data["diagram"] = build_diagram(data)
-                data["mermaid"] = build_mermaid(data)
+                data = await agent.run(self._ctx, directive=directive)
                 self._ctx[section] = data
-            if agent_id == "team_allocation":
-                await self._emit_cost()
 
-            # Record iteration state into memory & database
-            await self._memory.save_iteration_diff(section, data)
+                # Derived artifacts.
+                if agent_id == "architect":
+                    data["diagram"] = build_diagram(data)
+                    data["mermaid"] = build_mermaid(data)
+                    self._ctx[section] = data
+                if agent_id == "team_allocation":
+                    await self._emit_cost()
 
-            await self._emitter.section_complete(agent_id, section, node, data)
-            await self._emitter.node_update(node, "complete", 100, agent.name)
-            await self._emitter.log(agent_id, f"{agent.name}: complete ✓")
+                # Record versioned structured output in agent store & PostgreSQL
+                await self._memory.agent_store.save_output(agent_id, section, data, version=version)
+                await self._memory.save_iteration_diff(section, data)
 
-            # The sprint planner also satisfies the dedicated 'sprint' graph node.
-            if agent_id == "sprint_planner":
-                await self._emitter.node_update("sprint", "complete", 100, "Sprint Plan")
-        except Exception as exc:  # resilient: report and continue
-            logger.exception("Agent %s failed", agent_id)
-            await self._emitter.error(node, agent_id, str(exc)[:300])
-            await self._emitter.node_update(node, "complete", 100, agent.name)
-            await self._emitter.log(agent_id, f"{agent.name}: failed — {str(exc)[:160]}", level="error")
-        finally:
-            self._completed_units += 1
-            await self._emitter.progress(int(self._completed_units / TOTAL_UNITS * 100))
+                await self._emitter.section_complete(agent_id, section, node, data)
+                await self._emitter.node_update(node, "complete", 100, agent.name)
+                await self._emitter.log(agent_id, f"{agent.name}: complete ✓")
+
+                # The sprint planner also satisfies the dedicated 'sprint' graph node.
+                if agent_id == "sprint_planner":
+                    await self._emitter.node_update("sprint", "complete", 100, "Sprint Plan")
+                return True
+
+            except Exception as exc:
+                err_msg = str(exc)
+                logger.warning(
+                    "Agent %s attempt %d/%d failed: %s",
+                    agent_id, attempt, max_attempts, err_msg[:200],
+                )
+                if attempt < max_attempts:
+                    is_rate_limit = "429" in err_msg or "413" in err_msg or "rate limit" in err_msg.lower() or "tokens per minute" in err_msg.lower()
+                    backoff = 6.0 * attempt if is_rate_limit else 2.0 * attempt
+                    await self._emitter.log(
+                        agent_id,
+                        f"{agent.name}: transient issue, pausing {backoff:.1f}s before retry ({attempt}/{max_attempts})...",
+                        level="warning",
+                    )
+                    await asyncio.sleep(backoff)
+                else:
+                    logger.exception("Agent %s permanently failed after %d attempts", agent_id, max_attempts)
+                    await self._emitter.error(node, agent_id, str(exc)[:300])
+                    await self._emitter.node_update(node, "complete", 100, agent.name)
+                    await self._emitter.log(agent_id, f"{agent.name}: failed — {str(exc)[:160]}", level="error")
+                    return False
+            finally:
+                if not directive and attempt == 1:
+                    self._completed_units += 1
+                    await self._emitter.progress(int(self._completed_units / TOTAL_UNITS * 90))
+
+        return False
 
     async def _emit_cost(self) -> None:
         es = self._ctx.get("executive_summary", {}) or {}
@@ -118,10 +155,17 @@ class WorkflowEngine:
         # Cost shares the 'cost' graph node with the team allocation agent.
         await self._emitter.section_complete("team_allocation", "cost", "cost", cost)
 
-    async def run(self, idea: str, title: str | None = None) -> dict[str, Any]:
-        # Pre-load prior database state and conversation context for iterations
+    async def run(
+        self,
+        idea: str,
+        title: str | None = None,
+        only_missing: bool = True,
+        target_agents: list[str] | None = None,
+    ) -> dict[str, Any]:
+        # 1. Pre-load prior database state and conversation context for iterations
         prior_context = await self._memory.get_previous_project_context()
         chat_context = await self._memory.get_project_chat_context()
+        existing_outputs = await self._memory.agent_store.get_all_outputs()
 
         self._ctx = {
             "idea": idea,
@@ -132,15 +176,45 @@ class WorkflowEngine:
         if title:
             self._ctx["title"] = title
 
+        # Populate context with all existing completed deliverables
+        for sec_key, sec_data in existing_outputs.items():
+            if sec_data:
+                self._ctx[sec_key] = sec_data
+        if prior_context.get("previous_document"):
+            for sec_key in SECTION_OF.values():
+                if sec_key not in self._ctx and prior_context["previous_document"].get(sec_key):
+                    self._ctx[sec_key] = prior_context["previous_document"][sec_key]
+
         await self._emitter.run_started(
             [{"id": a.id, "name": a.name, "role": a.role, "node": a.node} for a in AGENTS.values()]
         )
         # The idea-intake node is satisfied as soon as we begin.
         await self._emitter.node_update("idea", "thinking", 30, "Idea Intake")
 
+        # 2. Run all stages with checkpoint resumability
         for stage in STAGES:
-            await asyncio.gather(*(self._run_agent(aid) for aid in stage))
+            for aid in stage:
+                sec = SECTION_OF[aid]
+                node = get_agent(aid).node
+                is_already_done = bool(self._ctx.get(sec))
+                is_targeted = target_agents and aid in target_agents
 
+                if only_missing and is_already_done and not is_targeted:
+                    # Skip re-running; section is already persisted in DB
+                    logger.info("Agent %s: Section '%s' already cached, restoring state", aid, sec)
+                    await self._emitter.node_update(node, "complete", 100, get_agent(aid).name)
+                    await self._emitter.section_complete(aid, sec, node, self._ctx[sec])
+                    await self._emitter.log(aid, f"{get_agent(aid).name}: Restored from database cache ✓")
+                    self._completed_units += 1
+                    await self._emitter.progress(int(self._completed_units / TOTAL_UNITS * 90))
+                else:
+                    await self._run_agent(aid)
+                    await asyncio.sleep(0.6)  # Gentle pacing for Groq free-tier TPM rate limits
+
+        # 3. Run CEO Supervisor outer loop for quality assurance & selective refinement
+        self._ctx = await self._supervisor.evaluate_and_supervise(self._ctx)
+
+        await self._emitter.progress(100)
         await self._emitter.run_complete()
         logger.info("Workflow complete for project %s", self._project_id)
         return self._ctx

@@ -133,6 +133,45 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({ logs: next.slice(-300), error: evt.message })
         break
       }
+      case 'supervisor_review': {
+        const next = [
+          ...state.logs,
+          {
+            agent: 'ceo',
+            level: evt.passed ? 'info' : 'warning',
+            message: `[CEO Supervision R${evt.round}] ${evt.passed ? 'Passed ✓' : `Re-evaluating (${evt.directives_count} directives)`} — ${evt.assessment}`,
+            ts: Date.now(),
+          },
+        ]
+        set({ logs: next.slice(-300), lastSeq: evt.seq ?? state.lastSeq })
+        break
+      }
+      case 'supervisor_directive': {
+        const next = [
+          ...state.logs,
+          {
+            agent: 'ceo',
+            level: 'warning',
+            message: `[CEO Directive R${evt.round} -> ${evt.agent}] ${evt.reason}`,
+            ts: Date.now(),
+          },
+        ]
+        set({ logs: next.slice(-300), lastSeq: evt.seq ?? state.lastSeq })
+        break
+      }
+      case 'quality_score': {
+        const next = [
+          ...state.logs,
+          {
+            agent: evt.agent,
+            level: evt.passed ? 'info' : 'warning',
+            message: `[Quality Gate] ${evt.passed ? 'Passed ✓' : `Issues: ${evt.issues.join(', ')}`}`,
+            ts: Date.now(),
+          },
+        ]
+        set({ logs: next.slice(-300), lastSeq: evt.seq ?? state.lastSeq })
+        break
+      }
       case 'ping':
       case 'stream_end':
       case 'run_started':

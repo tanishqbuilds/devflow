@@ -103,6 +103,21 @@ async def fetch_project_chat_history(project_id: str, limit: int = 20) -> list[d
         return []
 
 
+async def _resolve_user_id(conn: Any, project_id: str, fallback_user_id: str = "system") -> str:
+    """Resolve a valid user_id that exists in the users table."""
+    try:
+        row = await conn.fetchrow("SELECT user_id FROM projects WHERE id = $1", project_id)
+        if row and row["user_id"]:
+            return row["user_id"]
+        # Fallback to first user in users table
+        user_row = await conn.fetchrow("SELECT id FROM users LIMIT 1")
+        if user_row:
+            return user_row["id"]
+    except Exception:
+        pass
+    return fallback_user_id
+
+
 async def save_project_iteration(
     project_id: str,
     user_id: str,
@@ -116,11 +131,12 @@ async def save_project_iteration(
         return
     try:
         async with pool.acquire() as conn:
+            valid_user_id = await _resolve_user_id(conn, project_id, user_id)
             await conn.execute(
                 "INSERT INTO ai_responses (project_id, user_id, kind, role, content, payload) "
                 "VALUES ($1, $2, $3, $4, $5, $6)",
                 project_id,
-                user_id,
+                valid_user_id,
                 iteration_label,
                 "assistant",
                 f"Iteration update for section '{section}'",
@@ -128,3 +144,115 @@ async def save_project_iteration(
             )
     except Exception as exc:
         logger.warning("Failed to save iteration snapshot for %s: %s", project_id, exc)
+
+
+async def save_agent_output(
+    project_id: str,
+    user_id: str,
+    agent_id: str,
+    section: str,
+    data: dict[str, Any],
+    version: int = 1,
+) -> None:
+    """Store a versioned agent output as a structured record in ai_responses."""
+    pool = await get_db_pool()
+    if not pool:
+        return
+    try:
+        payload = {"agent_id": agent_id, "section": section, "version": version, "data": data}
+        async with pool.acquire() as conn:
+            valid_user_id = await _resolve_user_id(conn, project_id, user_id)
+            await conn.execute(
+                "INSERT INTO ai_responses (project_id, user_id, kind, role, content, payload) "
+                "VALUES ($1, $2, $3, $4, $5, $6)",
+                project_id,
+                valid_user_id,
+                f"agent_output:{agent_id}",
+                "assistant",
+                f"Agent '{agent_id}' output v{version} for section '{section}'",
+                json.dumps(payload, default=str),
+            )
+    except Exception as exc:
+        logger.warning("Failed to save agent output for %s/%s: %s", project_id, agent_id, exc)
+
+
+async def fetch_agent_output(project_id: str, agent_id: str) -> dict[str, Any] | None:
+    """Fetch the latest output for one specific agent."""
+    pool = await get_db_pool()
+    if not pool:
+        return None
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT payload FROM ai_responses "
+                "WHERE project_id = $1 AND kind = $2 "
+                "ORDER BY created_at DESC LIMIT 1",
+                project_id,
+                f"agent_output:{agent_id}",
+            )
+            if not row:
+                return None
+            payload = row["payload"]
+            if isinstance(payload, str):
+                payload = json.loads(payload)
+            return payload.get("data") if isinstance(payload, dict) else None
+    except Exception as exc:
+        logger.warning("Failed to fetch agent output for %s/%s: %s", project_id, agent_id, exc)
+        return None
+
+
+async def fetch_agent_outputs(project_id: str) -> dict[str, dict[str, Any]]:
+    """Fetch all latest agent outputs for a project, keyed by section."""
+    pool = await get_db_pool()
+    if not pool:
+        return {}
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT DISTINCT ON (kind) kind, payload FROM ai_responses "
+                "WHERE project_id = $1 AND kind LIKE 'agent_output:%' "
+                "ORDER BY kind, created_at DESC",
+                project_id,
+            )
+            result: dict[str, dict[str, Any]] = {}
+            for row in rows:
+                payload = row["payload"]
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+                if isinstance(payload, dict):
+                    section = payload.get("section", "")
+                    data = payload.get("data", {})
+                    if section and data:
+                        result[section] = data
+            return result
+    except Exception as exc:
+        logger.warning("Failed to fetch agent outputs for %s: %s", project_id, exc)
+        return {}
+
+
+async def save_quality_record(
+    project_id: str,
+    agent_id: str,
+    passed: bool,
+    issues: list[str],
+) -> None:
+    """Store a quality gate result for an agent."""
+    pool = await get_db_pool()
+    if not pool:
+        return
+    try:
+        payload = {"agent_id": agent_id, "passed": passed, "issues": issues}
+        async with pool.acquire() as conn:
+            valid_user_id = await _resolve_user_id(conn, project_id, "system")
+            await conn.execute(
+                "INSERT INTO ai_responses (project_id, user_id, kind, role, content, payload) "
+                "VALUES ($1, $2, $3, $4, $5, $6)",
+                project_id,
+                valid_user_id,
+                f"quality:{agent_id}",
+                "system",
+                f"Quality gate for '{agent_id}': {'PASSED' if passed else 'FAILED'}",
+                json.dumps(payload, default=str),
+            )
+    except Exception as exc:
+        logger.warning("Failed to save quality record for %s/%s: %s", project_id, agent_id, exc)

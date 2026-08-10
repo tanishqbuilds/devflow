@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from memory.agent_store import AgentStore
 from services.db_client import fetch_project_chat_history, fetch_project_document, save_project_iteration
 from services.redis_client import get_redis
 from utils.logging import get_logger
@@ -19,6 +20,7 @@ class ProjectMemory:
         self.user_id = user_id or "system"
         self._memory_key = f"project_memory:{project_id}"
         self._iteration_key = f"project_iterations:{project_id}"
+        self.agent_store = AgentStore(project_id, self.user_id)
 
     async def get_previous_project_context(self) -> dict[str, Any]:
         """Retrieve the authoritative prior database state of the project for iterations."""
@@ -42,7 +44,7 @@ class ProjectMemory:
             }
 
         # 2. Fallback to Redis cache
-        redis = await get_redis()
+        redis = get_redis()
         if redis:
             try:
                 cached = await redis.get(f"project_doc:{self.project_id}")
@@ -57,9 +59,22 @@ class ProjectMemory:
         """Retrieve recent chat interactions and user requests for this project."""
         return await fetch_project_chat_history(self.project_id, limit=10)
 
+    async def get_agent_specific_context(self, agent_id: str) -> dict[str, Any]:
+        """Return a minimal, token-efficient context for a specific agent.
+
+        Uses the agent_store to retrieve only the upstream sections this agent
+        depends on, dramatically reducing token waste.
+        """
+        scoped = await self.agent_store.get_scoped_outputs(agent_id)
+        decisions = await self.agent_store.get_decision_log()
+        return {
+            "upstream_outputs": scoped,
+            "quality_decisions": decisions,
+        }
+
     async def save_decision(self, agent_id: str, topic: str, decision: dict[str, Any]) -> None:
         """Store a durable architectural or product decision."""
-        redis = await get_redis()
+        redis = get_redis()
         entry = {
             "agent_id": agent_id,
             "topic": topic,
@@ -78,7 +93,7 @@ class ProjectMemory:
         await save_project_iteration(self.project_id, self.user_id, section, data)
 
         # Cache snapshot in Redis
-        redis = await get_redis()
+        redis = get_redis()
         if redis:
             try:
                 await redis.hset(self._iteration_key, section, json.dumps(data, default=str))
@@ -88,7 +103,7 @@ class ProjectMemory:
 
     async def get_history(self) -> list[dict[str, Any]]:
         """Retrieve all recorded decisions for this project."""
-        redis = await get_redis()
+        redis = get_redis()
         if not redis:
             return []
         try:

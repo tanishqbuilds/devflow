@@ -7,6 +7,7 @@ import { ArrowRight, Loader2, Wand2 } from 'lucide-react'
 import { analyzeProject } from '@/lib/api'
 import { Reveal } from './reveal'
 import { useAppUser, useAppAuth } from '@/lib/auth-context'
+import { useAppStore } from '@/lib/store'
 
 const EXAMPLES = [
   'AI-powered recruitment platform that screens candidates for startups',
@@ -75,6 +76,7 @@ export function InputSection() {
     setError(null)
     try {
       const { project_id } = await analyzeProject(idea)
+      useAppStore.getState().setActiveWorkspaceMode('track-live')
       router.push(`/workspace?project=${project_id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start. Is the backend running?')

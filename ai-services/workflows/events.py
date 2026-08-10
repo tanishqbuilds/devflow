@@ -67,3 +67,28 @@ class EventEmitter:
 
     async def error(self, node: str, agent: str, message: str) -> None:
         await self._publish({"type": "error", "node": node, "agent": agent, "message": message})
+
+    async def supervisor_review(self, round_num: int, passed: bool, assessment: str, directives_count: int = 0) -> None:
+        await self._publish({
+            "type": "supervisor_review",
+            "round": round_num,
+            "passed": passed,
+            "assessment": assessment,
+            "directives_count": directives_count,
+        })
+
+    async def supervisor_directive(self, agent_id: str, reason: str, round_num: int) -> None:
+        await self._publish({
+            "type": "supervisor_directive",
+            "agent": agent_id,
+            "reason": reason,
+            "round": round_num,
+        })
+
+    async def quality_score(self, agent_id: str, passed: bool, issues: list[str]) -> None:
+        await self._publish({
+            "type": "quality_score",
+            "agent": agent_id,
+            "passed": passed,
+            "issues": issues,
+        })
