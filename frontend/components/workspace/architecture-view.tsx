@@ -6,6 +6,7 @@ import '@xyflow/react/dist/style.css'
 import { Layout, Server, Database, Cloud, Lightbulb, TrendingUp } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 import type { ArchitectureLayer } from '@/lib/project-types'
 
 const LAYER_META: { key: string; label: string; icon: any; color: string; bg: string; border: string; text: string }[] = [
@@ -104,17 +105,19 @@ export function ArchitectureView() {
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-2">
                 <Icon className="w-4 h-4" style={{ color: meta.color }} /> {meta.label}
               </h3>
-              <p className="text-xs text-slate-600 mb-4 leading-relaxed">{layer.summary}</p>
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                <InlineEditable path={`/architecture/${meta.key}/summary`} value={layer.summary} multiline />
+              </p>
               
               <div className="mb-4">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Technologies</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {(layer.technologies || []).map((t) => (
+                  {(layer.technologies || []).map((t, tidx) => (
                     <span
-                      key={t}
+                      key={tidx}
                       className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${meta.bg} ${meta.border} ${meta.text}`}
                     >
-                      {t}
+                      <InlineEditable path={`/architecture/${meta.key}/technologies/${tidx}`} value={t} />
                     </span>
                   ))}
                 </div>
@@ -127,7 +130,9 @@ export function ArchitectureView() {
                     {layer.decisions.map((d: string, i: number) => (
                       <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
                         <span className="w-1 h-1 rounded-full bg-slate-400 mt-2 flex-shrink-0" />
-                        <span>{d}</span>
+                        <span className="flex-1">
+                          <InlineEditable path={`/architecture/${meta.key}/decisions/${i}`} value={d} multiline />
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -149,7 +154,9 @@ export function ArchitectureView() {
               {arch.scalability_plan.map((s: string, i: number) => (
                 <li key={i} className="text-xs text-slate-700 flex items-start gap-2">
                   <span className="text-emerald-500 font-bold">•</span>
-                  <span>{s}</span>
+                  <span className="flex-1">
+                    <InlineEditable path={`/architecture/scalability_plan/${i}`} value={s} multiline />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -164,7 +171,9 @@ export function ArchitectureView() {
               {arch.technology_recommendations.map((t: string, i: number) => (
                 <li key={i} className="text-xs text-slate-700 flex items-start gap-2">
                   <span className="text-amber-500 font-bold">•</span>
-                  <span>{t}</span>
+                  <span className="flex-1">
+                    <InlineEditable path={`/architecture/technology_recommendations/${i}`} value={t} multiline />
+                  </span>
                 </li>
               ))}
             </ul>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Users, Briefcase, Zap, ShieldCheck } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 
 export function TeamView() {
   const project = useProjectStore((s) => s.project)
@@ -54,20 +55,31 @@ export function TeamView() {
       <div className="space-y-4">
         {members.map((role, idx) => (
           <div key={idx} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  {role.role}
+            <div className="flex items-start justify-between mb-4 gap-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                  <InlineEditable path={`/team/members/${idx}/role`} value={role.role} className="font-bold text-slate-900" />
                   <span className="text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
-                    {role.seniority}
+                    <InlineEditable path={`/team/members/${idx}/seniority`} value={role.seniority} />
                   </span>
                 </h3>
                 {role.responsibilities?.length > 0 && (
-                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{role.responsibilities.join(' · ')}</p>
+                  <div className="text-xs text-slate-600 mt-2 leading-relaxed space-y-1">
+                    {role.responsibilities.map((resp, ridx) => (
+                      <div key={ridx} className="flex items-start gap-2">
+                        <span className="text-slate-400">•</span>
+                        <span className="flex-1">
+                          <InlineEditable path={`/team/members/${idx}/responsibilities/${ridx}`} value={resp} multiline />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="text-right bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2">
-                <p className="text-xl font-bold text-slate-900">{role.count}</p>
+              <div className="text-right bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 shrink-0">
+                <p className="text-xl font-bold text-slate-900">
+                  <InlineEditable path={`/team/members/${idx}/count`} value={role.count} />
+                </p>
                 <p className="text-[10px] uppercase font-bold text-slate-400">{role.count === 1 ? 'person' : 'people'}</p>
               </div>
             </div>
@@ -75,7 +87,9 @@ export function TeamView() {
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs font-semibold text-slate-500">Dedicated Allocation</p>
-                <span className="text-xs font-bold text-slate-900">{role.allocation_pct}%</span>
+                <span className="text-xs font-bold text-slate-900">
+                  <InlineEditable path={`/team/members/${idx}/allocation_pct`} value={role.allocation_pct} />%
+                </span>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                 <div
@@ -88,9 +102,9 @@ export function TeamView() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Required Core Skills</p>
               <div className="flex flex-wrap gap-1.5">
-                {(role.skills || []).map((skill) => (
-                  <span key={skill} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-semibold">
-                    {skill}
+                {(role.skills || []).map((skill, sidx) => (
+                  <span key={sidx} className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-semibold">
+                    <InlineEditable path={`/team/members/${idx}/skills/${sidx}`} value={skill} />
                   </span>
                 ))}
               </div>
@@ -109,7 +123,9 @@ export function TeamView() {
             {team.ownership.map((o, i) => (
               <li key={i} className="text-xs text-slate-700 flex gap-2.5 items-start">
                 <span className="text-emerald-600 font-bold">•</span>
-                <span>{o}</span>
+                <span className="flex-1">
+                  <InlineEditable path={`/team/ownership/${i}`} value={o} multiline />
+                </span>
               </li>
             ))}
           </ul>

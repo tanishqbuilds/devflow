@@ -19,6 +19,7 @@ from prompts.context import (
     summarize_requirements,
 )
 from utils.logging import get_logger
+from pydantic import BaseModel, Field
 
 logger = get_logger("assistant")
 
@@ -30,6 +31,14 @@ SYSTEM_PROMPT = (
     "give specific numbers from the plan, and end with a suggested next step when useful. "
     "Never invent metrics that aren't in the context."
 )
+
+class AssistantEdit(BaseModel):
+    path: str = Field(description="Existing JSON pointer path in the project, e.g. /executive_summary/tagline")
+    value: Any
+
+class AssistantCommand(BaseModel):
+    reply: str
+    edits: list[AssistantEdit] = Field(default_factory=list)
 
 
 def _line(label: str, value: Any) -> str:
@@ -102,7 +111,7 @@ async def chat(
     project: dict[str, Any],
     message: str,
     history: list[dict[str, str]] | None = None,
-) -> str:
+) -> AssistantCommand:
     model = get_chat_model(model=FAST_MODEL, temperature=0.45, max_tokens=600)
     context = build_project_context(project)
     messages = [
@@ -117,5 +126,32 @@ async def chat(
             messages.append(AIMessage(content=content))
     messages.append(HumanMessage(content=message[:2000]))
 
-    response = await model.ainvoke(messages)
-    return str(response.content).strip()
+    command_model = model.with_structured_output(AssistantCommand)
+    compact_json=__import__('json').dumps(project,default=str,separators=(",",":"))[:10000]
+    messages[0] = SystemMessage(content=f"{SYSTEM_PROMPT}\n\nYou are named Flowmate. You may edit the workspace when the user asks. For an edit request, return the smallest set of JSON-pointer edits targeting existing user-facing fields; never target id, user_id, workspace_id, revision, orchestration, status, or progress. For a question, return no edits. Always set reply and make edits an array.\n\n--- PROJECT SUMMARY ---\n{context}\n\n--- EDITABLE PROJECT JSON (TRUNCATED) ---\n{compact_json}")
+    try:
+        return await command_model.ainvoke(messages)
+    except Exception as exc:
+        # Some smaller OpenAI-compatible models emit a useful tool payload that
+        # narrowly misses the schema (commonly one edit object instead of a list).
+        # Recover it before falling back to a normal conversational completion.
+        import json, re
+        match=re.search(r'<function=AssistantCommand>\s*(\{.*?\})\s*</function>',str(exc),re.S)
+        if match:
+            try:
+                raw=json.loads(match.group(1)); edits=raw.get("edits",[])
+                if isinstance(edits,dict): edits=[edits]
+                return AssistantCommand(reply=raw.get("reply") or f"Applied {len(edits)} requested workspace change(s).",edits=edits)
+            except Exception:
+                pass
+        logger.warning("Structured Flowmate response failed; falling back to text: %s",str(exc)[:180])
+        response=await model.ainvoke(messages)
+        reply=str(response.content).strip()
+        edits=[]
+        for block in re.findall(r"```(?:json)?\s*(\{.*?\})\s*```",reply,re.S):
+            try:
+                mapping=json.loads(block)
+                edits.extend(AssistantEdit(path=path,value=value) for path,value in mapping.items() if str(path).startswith("/"))
+            except Exception:
+                continue
+        return AssistantCommand(reply=reply,edits=edits)

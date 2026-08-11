@@ -68,7 +68,7 @@ export function AiAssistant() {
         {
           role: 'assistant',
           content:
-            "Hi — I'm your Devflow Copilot. I can query this project's complete plan: requirements, architecture, backlog, risks, team, budget, and timeline.",
+            "Hi — I'm Flowmate. I can answer questions and edit this project's plan. Every change is saved with an undoable revision.",
         },
       ])
     }
@@ -95,7 +95,8 @@ export function AiAssistant() {
     setInput('')
     setBusy(true)
     try {
-      const { reply } = await askAssistant(projectId, q, history)
+      const { reply, project: changedProject } = await askAssistant(projectId, q, history)
+      if (changedProject) useProjectStore.getState().setProject(changedProject)
       setMessages((m) => [...m, { role: 'assistant', content: reply || 'No answer returned.' }])
     } catch (e) {
       setMessages((m) => [
@@ -117,7 +118,7 @@ export function AiAssistant() {
             className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 pl-4 pr-5 py-2.5 text-white font-medium shadow-lg hover:shadow-xl transition-all cursor-pointer text-xs"
           >
             <Sparkles className="w-4 h-4" />
-            Devflow Copilot
+            Flowmate
           </button>
         )}
       </AnimatePresence>
@@ -139,7 +140,7 @@ export function AiAssistant() {
                   <Bot className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-900">Devflow Copilot</div>
+                  <div className="text-xs font-bold text-slate-900">Flowmate</div>
                   <div className="text-[10px] text-slate-500">
                     {ready ? 'Grounded in project plan' : 'Awaiting project plan…'}
                   </div>
@@ -204,7 +205,7 @@ export function AiAssistant() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask anything about this plan…"
+                  placeholder="Ask or tell Flowmate what to edit…"
                   className="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button

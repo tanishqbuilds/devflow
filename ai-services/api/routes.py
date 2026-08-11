@@ -120,7 +120,7 @@ async def assistant(req: AssistantChatRequest) -> dict[str, Any]:
     if not req.message.strip():
         raise HTTPException(status_code=422, detail="message is required")
     try:
-        reply = await assistant_chat(
+        result = await assistant_chat(
             req.project,
             req.message,
             [{"role": m.role, "content": m.content} for m in req.history],
@@ -128,4 +128,4 @@ async def assistant(req: AssistantChatRequest) -> dict[str, Any]:
     except Exception as exc:
         logger.exception("Assistant chat failed")
         raise HTTPException(status_code=502, detail=f"assistant failed: {exc}")
-    return {"reply": reply}
+    return result.model_dump()

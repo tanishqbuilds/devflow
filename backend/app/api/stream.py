@@ -78,7 +78,7 @@ async def stream(websocket: WebSocket, project_id: str) -> None:
                 continue
             max_seq = int(event.get("seq", max_seq))
             await websocket.send_json(event)
-            if event.get("type") == "run_complete":
+            if event.get("type") in ("run_complete","run_failed"):
                 await websocket.send_json({"type": "stream_end"})
                 break
     except WebSocketDisconnect:

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Github, Calendar, Rocket, CreditCard, MessageSquare, BarChart3, Plug, GitBranch } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 
 const categoryIcon: Record<string, any> = {
   github: Github,
@@ -47,19 +48,27 @@ export function IntegrationsView() {
                 <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                   <Icon className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">{integ.name}</h3>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">{integ.category}</span>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    <InlineEditable path={`/integrations/integrations/${idx}/name`} value={integ.name} />
+                  </h3>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    <InlineEditable path={`/integrations/integrations/${idx}/category`} value={integ.category} />
+                  </span>
                 </div>
               </div>
-              <p className="text-xs text-slate-600 mb-3 leading-relaxed">{integ.purpose}</p>
+              <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+                <InlineEditable path={`/integrations/integrations/${idx}/purpose`} value={integ.purpose} multiline />
+              </p>
               
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Integration Steps</span>
                 {(integ.steps || []).map((s, i) => (
                   <div key={i} className="text-xs text-slate-700 flex gap-2 items-start">
                     <span className="text-blue-600 font-bold font-mono text-[11px]">{i + 1}.</span>
-                    <span>{s}</span>
+                    <span className="flex-1">
+                      <InlineEditable path={`/integrations/integrations/${idx}/steps/${i}`} value={s} multiline />
+                    </span>
                   </div>
                 ))}
               </div>
@@ -78,7 +87,9 @@ export function IntegrationsView() {
             {(data.deployment_plan || []).map((s, i) => (
               <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
                 <span className="text-emerald-600 font-bold font-mono text-[11px]">{i + 1}.</span>
-                <span>{s}</span>
+                <span className="flex-1">
+                  <InlineEditable path={`/integrations/deployment_plan/${i}`} value={s} multiline />
+                </span>
               </li>
             ))}
           </ol>
@@ -91,7 +102,9 @@ export function IntegrationsView() {
             {(data.cicd_recommendations || []).map((s, i) => (
               <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
                 <span className="text-purple-600 font-bold">•</span>
-                <span>{s}</span>
+                <span className="flex-1">
+                  <InlineEditable path={`/integrations/cicd_recommendations/${i}`} value={s} multiline />
+                </span>
               </li>
             ))}
           </ul>

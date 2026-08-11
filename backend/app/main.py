@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.api.projects import agents_router, router as projects_router
 from app.api.stream import router as stream_router
 from app.api.users import router as users_router
+from app.api.workspaces import router as workspaces_router
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.postgres import close_postgres, init_postgres, pool
@@ -54,6 +55,7 @@ app.include_router(projects_router)
 app.include_router(agents_router)
 app.include_router(stream_router)
 app.include_router(users_router)
+app.include_router(workspaces_router)
 
 
 @app.get("/docs", include_in_schema=False)

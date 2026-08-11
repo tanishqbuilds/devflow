@@ -29,11 +29,11 @@ a live, streaming orchestration graph rather than a chat box.
 
 ```
                  ┌──────────────────────────────────────────────┐
-   Browser ──────▶  frontend (Next.js 16, React 19, Tailwind v4) │  :3100
+   Browser ──────▶  frontend (Next.js 16, React 19, Tailwind v4) │  :3000
                  └───────────────┬──────────────────────────────┘
                                  │ REST + WebSocket (only the backend)
                  ┌───────────────▼──────────────────────────────┐
-                 │  backend (FastAPI) — orchestration layer       │  :8010
+                 │  backend (FastAPI) — orchestration layer       │  :8000
                  │  • POST /projects/analyze  GET /projects/:id   │
                  │  • WS  /projects/:id/stream                    │
                  │  • Redis job queue + worker + event relay      │

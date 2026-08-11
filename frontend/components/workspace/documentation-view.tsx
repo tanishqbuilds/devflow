@@ -14,19 +14,19 @@ import {
 import { useProjectStore } from '@/lib/project-store'
 import type { ProjectDoc } from '@/lib/project-types'
 
-const MAX_LIST = 12
+const MAX_LIST = 15
 
 function priorityClass(p?: string): string {
   switch ((p || '').toLowerCase()) {
     case 'critical':
     case 'high':
-      return 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+      return 'bg-rose-50 text-rose-700 border-rose-200'
     case 'medium':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+      return 'bg-amber-50 text-amber-700 border-amber-200'
     case 'low':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
     default:
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+      return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
 
@@ -35,9 +35,6 @@ function truncate<T>(arr: T[] | undefined | null): { items: T[]; more: number } 
   return { items: list.slice(0, MAX_LIST), more: Math.max(0, list.length - MAX_LIST) }
 }
 
-// ---------------------------------------------------------------------------
-// Markdown builder — produces a sensible '# Title' -> '## Section' document.
-// ---------------------------------------------------------------------------
 function buildMarkdown(project: ProjectDoc): string {
   const out: string[] = []
   const exec = project.executive_summary
@@ -98,151 +95,97 @@ function buildMarkdown(project: ProjectDoc): string {
       if (layer.summary) out.push(layer.summary)
       if (layer.technologies?.length) out.push(`*Tech:* ${layer.technologies.join(', ')}`)
       if (layer.components?.length) out.push(`*Components:* ${layer.components.join(', ')}`)
+      if (layer.decisions?.length) out.push(`*Decisions:*\n${bullets(layer.decisions)}`)
     }
-    if (arch.technology_recommendations?.length)
-      out.push(`\n### Technology Recommendations\n${bullets(arch.technology_recommendations)}`)
-    if (arch.scalability_plan?.length) out.push(`\n### Scalability Plan\n${bullets(arch.scalability_plan)}`)
   }
 
   const backlog = project.backlog
   if (backlog) {
-    out.push('\n## Backlog')
-    out.push(
-      `Methodology: ${backlog.methodology || 'n/a'} · Sprint length: ${backlog.sprint_length_weeks || 0} weeks · ${
-        backlog.tasks?.length || 0
-      } tasks`,
-    )
-    if (backlog.epics?.length) {
-      out.push('\n### Epics')
-      out.push(backlog.epics.map((e) => `- **${e.title}** — ${e.description}`).join('\n'))
-    }
+    out.push('\n## Backlog & Sprints')
+    if (backlog.methodology) out.push(`Methodology: ${backlog.methodology}`)
     if (backlog.sprints?.length) {
-      out.push('\n### Sprints')
-      out.push(
-        backlog.sprints
-          .map((s) => `- Sprint ${s.number}: ${s.name} — ${s.goal} (${s.task_titles?.length || 0} tasks)`)
-          .join('\n'),
-      )
+      for (const s of backlog.sprints) {
+        out.push(`\n### Sprint ${s.number}: ${s.name}`)
+        if (s.goal) out.push(`Goal: ${s.goal}`)
+        const tasks = (backlog.tasks || []).filter((t) => t.sprint === s.number)
+        for (const t of tasks) {
+          out.push(`- **${t.title}** (${t.priority}, ${t.estimated_days}d) — ${t.description || ''}`)
+        }
+      }
     }
   }
 
   const risks = project.risks
   if (risks) {
     out.push('\n## Risks')
-    if (risks.overall_risk_level) out.push(`**Overall risk level:** ${risks.overall_risk_level}`)
+    if (risks.overall_risk_level) out.push(`Overall: ${risks.overall_risk_level}`)
     if (risks.summary) out.push(risks.summary)
-    if (risks.risks?.length) {
-      out.push('')
-      out.push(
-        risks.risks
-          .map((r) => `- **${r.title}** (${r.severity}) — ${r.description}\n  - *Mitigation:* ${r.mitigation}`)
-          .join('\n'),
-      )
+    for (const r of risks.risks || []) {
+      out.push(`- **${r.title}** [${r.severity}] — ${r.description} (Mitigation: ${r.mitigation})`)
     }
   }
 
   const team = project.team
   if (team) {
     out.push('\n## Team')
-    if (team.members?.length) {
-      out.push(
-        team.members
-          .map((m) => `- **${m.count}× ${m.seniority} ${m.role}** (${m.allocation_pct}% allocation) — ${(m.skills || []).join(', ')}`)
-          .join('\n'),
-      )
+    for (const m of team.members || []) {
+      out.push(`- **${m.role}** (${m.seniority}, ${m.count}x, ${m.allocation_pct}%): ${(m.skills || []).join(', ')}`)
     }
-    if (team.staffing_notes?.length) out.push(`\n### Staffing Notes\n${bullets(team.staffing_notes)}`)
   }
 
   const cost = project.cost
   if (cost) {
     out.push('\n## Cost')
-    out.push(
-      `**Monthly:** $${Math.round(cost.monthly_total_usd || 0).toLocaleString()} · **Project total:** $${Math.round(
-        cost.project_total_usd || 0,
-      ).toLocaleString()} over ${cost.duration_months || 0} months`,
-    )
-    if (cost.lines?.length) {
-      out.push('')
-      out.push(
-        cost.lines
-          .map((l) => `- ${l.category}: $${Math.round(l.monthly_usd).toLocaleString()}/mo${l.notes ? ` — ${l.notes}` : ''}`)
-          .join('\n'),
-      )
-    }
+    if (cost.monthly_total_usd) out.push(`Monthly: $${Math.round(cost.monthly_total_usd).toLocaleString()}`)
+    if (cost.project_total_usd) out.push(`Total: $${Math.round(cost.project_total_usd).toLocaleString()}`)
   }
 
   const timeline = project.timeline
   if (timeline) {
-    out.push('\n## Timeline')
-    if (timeline.total_duration_weeks) out.push(`**Total duration:** ${timeline.total_duration_weeks} weeks`)
-    if (timeline.milestones?.length) {
-      out.push('\n### Milestones')
-      out.push(
-        timeline.milestones
-          .map((m) => `- **${m.title}** [${m.phase}] — week ${m.start_week} for ${m.duration_weeks}w. ${m.description}`)
-          .join('\n'),
-      )
+    out.push('\n## Timeline & Milestones')
+    for (const m of timeline.milestones || []) {
+      out.push(`- **${m.title}** (${m.phase}, W${m.start_week}+${m.duration_weeks}w) — ${m.description}`)
     }
-    if (timeline.critical_path?.length) out.push(`\n### Critical Path\n${bullets(timeline.critical_path)}`)
-  }
-
-  const integ = project.integrations
-  if (integ) {
-    out.push('\n## Integrations')
-    if (integ.integrations?.length) {
-      out.push(
-        integ.integrations.map((i) => `- **${i.name}** (${i.category}) — ${i.purpose}`).join('\n'),
-      )
-    }
-    if (integ.deployment_plan?.length) out.push(`\n### Deployment Plan\n${bullets(integ.deployment_plan)}`)
-    if (integ.cicd_recommendations?.length) out.push(`\n### CI/CD Recommendations\n${bullets(integ.cicd_recommendations)}`)
   }
 
   return out.join('\n')
 }
 
-// ---------------------------------------------------------------------------
-// Small presentational helpers
-// ---------------------------------------------------------------------------
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-white/5 pt-6 first:border-t-0 first:pt-0">
-      <h3 id={id} className="text-xl font-bold text-foreground mb-3 flex items-center gap-2">
-        <span className="h-5 w-1 rounded-full bg-gradient-to-b from-primary to-secondary" />
-        {title}
-      </h3>
-      <div className="space-y-3 text-sm">{children}</div>
+    <section id={id} className="space-y-3 pt-6 border-t border-slate-100 first:pt-0 first:border-0">
+      <h2 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h2>
+      {children}
     </section>
   )
 }
 
 function SubHead({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-sm font-semibold text-foreground/90 mt-2 mb-1 uppercase tracking-wide">{children}</h4>
+  return <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{children}</h3>
 }
 
-function PlainList({ items }: { items: string[] }) {
-  const { items: shown, more } = truncate(items)
-  if (!shown.length) return null
+function PlainList({ items }: { items?: (string | undefined)[] }) {
+  const clean = (items || []).filter(Boolean) as string[]
+  if (!clean.length) return null
   return (
-    <ul className="list-disc pl-5 space-y-1 text-muted-foreground marker:text-primary/60">
-      {shown.map((it, i) => (
-        <li key={i}>{it}</li>
+    <ul className="space-y-1.5 text-xs text-slate-700">
+      {clean.map((it, idx) => (
+        <li key={idx} className="flex items-start gap-2">
+          <span className="text-blue-600 font-bold">•</span>
+          <span>{it}</span>
+        </li>
       ))}
-      {more > 0 && <li className="list-none text-xs text-muted-foreground/70 italic">+{more} more</li>}
     </ul>
   )
 }
 
-function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+function Badge({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={`inline-block text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border ${className || 'bg-white/5 text-muted-foreground border-white/10'}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${className}`}>
       {children}
     </span>
   )
 }
-
-const secondaryViolet = '#7c3aed'
 
 export function DocumentationView() {
   const project = useProjectStore((s) => s.project)
@@ -250,20 +193,11 @@ export function DocumentationView() {
 
   if (!project) {
     return (
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="glass-panel p-10 rounded-xl flex flex-col items-center justify-center text-center gap-4">
-          <motion.div
-            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 1.8, repeat: Infinity }}
-          >
-            <FileText className="w-10 h-10 text-primary" />
-          </motion.div>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Documentation &amp; Export</h2>
-            <p className="text-muted-foreground mt-1">Documentation is being generated by the AI organization.</p>
-          </div>
-        </div>
-      </motion.div>
+      <div className="bg-white border border-slate-200 p-10 rounded-2xl flex flex-col items-center justify-center text-center gap-3">
+        <FileText className="w-10 h-10 text-blue-600" />
+        <h2 className="text-xl font-bold text-slate-900">Documentation &amp; Export</h2>
+        <p className="text-slate-500 text-xs">Documentation is being generated by the AI organization.</p>
+      </div>
     )
   }
 
@@ -312,91 +246,83 @@ export function DocumentationView() {
   }
 
   return (
-    <motion.div
-      className="space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
+    <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
-          <FileText className="w-7 h-7 text-primary" />
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+            <FileText className="w-4 h-4" />
+          </div>
           Documentation &amp; Export
         </h2>
-        <p className="text-muted-foreground">
-          No lock-in. Take your entire plan with you — JSON, Markdown, or a printable PDF.
+        <p className="text-slate-500 text-sm mt-1">
+          Complete project blueprint ready for team export in JSON, Markdown, or printable PDF formats.
         </p>
       </div>
 
       {/* Export action bar */}
-      <div className="glass-panel p-4 rounded-xl flex flex-wrap items-center gap-3 print:hidden">
+      <div className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-wrap items-center gap-3 print:hidden shadow-xs">
         <button
           onClick={handleDownloadJson}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
         >
           <Download className="w-4 h-4" />
           Download JSON
         </button>
         <button
           onClick={handleCopyMarkdown}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors"
-          style={{
-            color: copied ? '#34d399' : secondaryViolet,
-            borderColor: copied ? 'rgba(52,211,153,0.4)' : 'rgba(124,58,237,0.4)',
-            backgroundColor: copied ? 'rgba(52,211,153,0.12)' : 'rgba(124,58,237,0.12)',
-          }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
         >
-          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          {copied ? 'Copied!' : 'Copy as Markdown'}
+          {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied to Clipboard!' : 'Copy as Markdown'}
         </button>
         <button
           onClick={handlePrint}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white/5 text-foreground border border-white/10 hover:bg-white/10 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-colors"
         >
           <Printer className="w-4 h-4" />
           Print / PDF
         </button>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-400">
           <FileCode2 className="w-3.5 h-3.5" />
           Open formats, zero lock-in
         </span>
       </div>
 
       {/* The document */}
-      <article className="glass-panel p-8 rounded-xl space-y-8">
+      <article className="bg-white border border-slate-200 p-8 rounded-2xl space-y-8 shadow-xs">
         {/* Doc title block */}
         <header className="space-y-2 pb-2">
-          <h1 className="text-3xl font-bold text-foreground">{docTitle}</h1>
-          {exec?.tagline && <p className="text-primary text-lg">{exec.tagline}</p>}
-          {project.idea && <p className="text-sm text-muted-foreground italic max-w-3xl">{project.idea}</p>}
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{docTitle}</h1>
+          {exec?.tagline && <p className="text-blue-600 font-medium text-sm">{exec.tagline}</p>}
+          {project.idea && <p className="text-xs text-slate-500 italic max-w-3xl">{project.idea}</p>}
           <div className="flex flex-wrap gap-2 pt-1">
-            {project.status && <Badge className="bg-primary/10 text-primary border-primary/30">{project.status}</Badge>}
+            {project.status && <Badge className="bg-blue-50 text-blue-700 border-blue-200 capitalize">{project.status}</Badge>}
             {typeof project.progress === 'number' && (
-              <Badge className="bg-white/5 text-muted-foreground border-white/10">{project.progress}% complete</Badge>
+              <Badge className="bg-slate-50 text-slate-600 border-slate-200">{project.progress}% complete</Badge>
             )}
           </div>
         </header>
 
         {/* Executive Summary */}
-        {exec ? (
+        {exec && (
           <Section id="doc-exec" title="Executive Summary">
-            {exec.overview && <p className="text-muted-foreground leading-relaxed">{exec.overview}</p>}
+            {exec.overview && <p className="text-slate-600 text-xs leading-relaxed">{exec.overview}</p>}
             {exec.vision && (
-              <p className="text-foreground/80 leading-relaxed border-l-2 border-secondary/40 pl-4">{exec.vision}</p>
+              <p className="text-slate-700 text-xs leading-relaxed border-l-2 border-blue-500 pl-3 bg-slate-50 p-2.5 rounded-r-lg">{exec.vision}</p>
             )}
             <div className="flex flex-wrap gap-2">
               {exec.complexity_label && (
-                <Badge className="bg-secondary/10 text-violet-300 border-secondary/30">
+                <Badge className="bg-purple-50 text-purple-700 border-purple-200">
                   Complexity: {exec.complexity_label} ({exec.complexity_score})
                 </Badge>
               )}
               {exec.estimated_duration_weeks ? (
-                <Badge className="bg-primary/10 text-primary border-primary/30">
+                <Badge className="bg-blue-50 text-blue-700 border-blue-200">
                   ~{exec.estimated_duration_weeks} weeks
                 </Badge>
               ) : null}
               {exec.recommended_team_size ? (
-                <Badge className="bg-white/5 text-muted-foreground border-white/10">
+                <Badge className="bg-slate-50 text-slate-600 border-slate-200">
                   {exec.recommended_team_size} people
                 </Badge>
               ) : null}
@@ -420,396 +346,114 @@ export function DocumentationView() {
               </div>
             )}
           </Section>
-        ) : null}
+        )}
 
         {/* Requirements */}
-        {req ? (
+        {req && (
           <Section id="doc-req" title="Requirements">
             {!!req.functional_requirements?.length && (
               <div>
                 <SubHead>Functional</SubHead>
                 <div className="space-y-2">
                   {truncate(req.functional_requirements).items.map((r, i) => (
-                    <div key={i} className="flex items-start gap-2">
+                    <div key={i} className="flex items-start gap-2 text-xs">
                       <Badge className={priorityClass(r.priority)}>{r.priority}</Badge>
-                      <p className="text-muted-foreground">
-                        <span className="text-foreground font-medium">{r.title}</span> — {r.description}
+                      <p className="text-slate-600">
+                        <span className="text-slate-900 font-semibold">{r.title}</span> — {r.description}
                       </p>
                     </div>
                   ))}
-                  {truncate(req.functional_requirements).more > 0 && (
-                    <p className="text-xs text-muted-foreground/70 italic">
-                      +{truncate(req.functional_requirements).more} more
-                    </p>
-                  )}
                 </div>
               </div>
             )}
             {!!req.non_functional_requirements?.length && (
-              <div>
+              <div className="mt-4">
                 <SubHead>Non-Functional</SubHead>
                 <div className="space-y-2">
                   {truncate(req.non_functional_requirements).items.map((r, i) => (
-                    <div key={i} className="flex items-start gap-2">
+                    <div key={i} className="flex items-start gap-2 text-xs">
                       <Badge className={priorityClass(r.priority)}>{r.priority}</Badge>
-                      <p className="text-muted-foreground">
-                        <span className="text-foreground font-medium">{r.title}</span> — {r.description}
+                      <p className="text-slate-600">
+                        <span className="text-slate-900 font-semibold">{r.title}</span> — {r.description}
                       </p>
                     </div>
                   ))}
-                  {truncate(req.non_functional_requirements).more > 0 && (
-                    <p className="text-xs text-muted-foreground/70 italic">
-                      +{truncate(req.non_functional_requirements).more} more
-                    </p>
-                  )}
                 </div>
               </div>
             )}
             {!!req.user_stories?.length && (
-              <div>
+              <div className="mt-4">
                 <SubHead>User Stories</SubHead>
-                <ul className="list-disc pl-5 space-y-1 text-muted-foreground marker:text-secondary/60">
+                <ul className="space-y-1.5 text-xs text-slate-600">
                   {truncate(req.user_stories).items.map((s, i) => (
-                    <li key={i}>
-                      As a <span className="text-foreground">{s.as_a}</span>, I want {s.i_want} so that {s.so_that}
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>
+                        As a <strong className="text-slate-900">{s.as_a}</strong>, I want {s.i_want} so that {s.so_that}
+                      </span>
                     </li>
                   ))}
-                  {truncate(req.user_stories).more > 0 && (
-                    <li className="list-none text-xs text-muted-foreground/70 italic">
-                      +{truncate(req.user_stories).more} more
-                    </li>
-                  )}
                 </ul>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {!!req.scope_in?.length && (
-                <div>
-                  <SubHead>In Scope</SubHead>
-                  <PlainList items={req.scope_in} />
-                </div>
-              )}
-              {!!req.scope_out?.length && (
-                <div>
-                  <SubHead>Out of Scope</SubHead>
-                  <PlainList items={req.scope_out} />
-                </div>
-              )}
-            </div>
           </Section>
-        ) : null}
+        )}
 
         {/* Architecture */}
-        {arch ? (
-          <Section id="doc-arch" title="Architecture">
+        {arch && (
+          <Section id="doc-arch" title="System Architecture">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(
-                [
-                  ['Frontend', arch.frontend],
-                  ['Backend', arch.backend],
-                  ['Database', arch.database],
-                  ['Infrastructure', arch.infrastructure],
-                ] as const
-              ).map(([name, layer]) =>
-                layer ? (
-                  <div key={name} className="bg-card/40 border border-white/5 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-foreground mb-1">{name}</p>
-                    {layer.summary && <p className="text-xs text-muted-foreground mb-2">{layer.summary}</p>}
+              {[
+                { name: 'Frontend Tier', layer: arch.frontend },
+                { name: 'Backend Tier', layer: arch.backend },
+                { name: 'Database Tier', layer: arch.database },
+                { name: 'Infrastructure Tier', layer: arch.infrastructure },
+              ].map(({ name, layer }) => {
+                if (!layer) return null
+                return (
+                  <div key={name} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <h3 className="font-bold text-xs text-slate-900">{name}</h3>
+                    {layer.summary && <p className="text-xs text-slate-600">{layer.summary}</p>}
                     {!!layer.technologies?.length && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {layer.technologies.slice(0, MAX_LIST).map((t, i) => (
-                          <Badge key={i} className="bg-primary/10 text-primary border-primary/20">
-                            {t}
-                          </Badge>
-                        ))}
-                      </div>
+                      <p className="text-xs text-slate-500">
+                        <strong className="text-slate-700">Technologies:</strong> {layer.technologies.join(', ')}
+                      </p>
                     )}
                   </div>
-                ) : null,
-              )}
+                )
+              })}
             </div>
-            {!!arch.technology_recommendations?.length && (
-              <div>
-                <SubHead>Technology Recommendations</SubHead>
-                <PlainList items={arch.technology_recommendations} />
-              </div>
-            )}
-            {!!arch.scalability_plan?.length && (
-              <div>
-                <SubHead>Scalability Plan</SubHead>
-                <PlainList items={arch.scalability_plan} />
-              </div>
-            )}
-            {!!arch.integration_points?.length && (
-              <div>
-                <SubHead>Integration Points</SubHead>
-                <PlainList items={arch.integration_points} />
-              </div>
-            )}
           </Section>
-        ) : null}
-
-        {/* Backlog */}
-        {backlog ? (
-          <Section id="doc-backlog" title="Backlog">
-            <div className="flex flex-wrap gap-2">
-              {backlog.methodology && (
-                <Badge className="bg-secondary/10 text-violet-300 border-secondary/30">{backlog.methodology}</Badge>
-              )}
-              {backlog.sprint_length_weeks ? (
-                <Badge className="bg-white/5 text-muted-foreground border-white/10">
-                  {backlog.sprint_length_weeks}-week sprints
-                </Badge>
-              ) : null}
-              <Badge className="bg-primary/10 text-primary border-primary/30">
-                {backlog.tasks?.length || 0} tasks
-              </Badge>
-            </div>
-            {!!backlog.epics?.length && (
-              <div>
-                <SubHead>Epics</SubHead>
-                <ul className="list-disc pl-5 space-y-1 text-muted-foreground marker:text-primary/60">
-                  {truncate(backlog.epics).items.map((e, i) => (
-                    <li key={i}>
-                      <span className="text-foreground font-medium">{e.title}</span> — {e.description}
-                    </li>
-                  ))}
-                  {truncate(backlog.epics).more > 0 && (
-                    <li className="list-none text-xs text-muted-foreground/70 italic">
-                      +{truncate(backlog.epics).more} more
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-            {!!backlog.sprints?.length && (
-              <div>
-                <SubHead>Sprints</SubHead>
-                <div className="space-y-2">
-                  {truncate(backlog.sprints).items.map((s, i) => (
-                    <div key={i} className="bg-card/40 border border-white/5 rounded-lg p-3">
-                      <p className="text-sm text-foreground font-medium">
-                        Sprint {s.number}: {s.name}
-                      </p>
-                      {s.goal && <p className="text-xs text-muted-foreground">{s.goal}</p>}
-                      <p className="text-[11px] text-muted-foreground/70 mt-1">
-                        {s.task_titles?.length || 0} tasks
-                      </p>
-                    </div>
-                  ))}
-                  {truncate(backlog.sprints).more > 0 && (
-                    <p className="text-xs text-muted-foreground/70 italic">
-                      +{truncate(backlog.sprints).more} more sprints
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </Section>
-        ) : null}
+        )}
 
         {/* Risks */}
-        {risks ? (
-          <Section id="doc-risks" title="Risks">
+        {risks && (
+          <Section id="doc-risks" title="Security & Risk Assessment">
             {risks.overall_risk_level && (
-              <Badge className={priorityClass(risks.overall_risk_level)}>
-                Overall: {risks.overall_risk_level}
-              </Badge>
+              <p className="text-xs text-slate-600">
+                Overall Risk Profile: <Badge className="bg-amber-50 text-amber-700 border-amber-200">{risks.overall_risk_level}</Badge>
+              </p>
             )}
-            {risks.summary && <p className="text-muted-foreground leading-relaxed">{risks.summary}</p>}
-            {!!risks.risks?.length && (
-              <div className="space-y-2">
-                {truncate(risks.risks).items.map((r, i) => (
-                  <div key={i} className="bg-card/40 border border-white/5 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge className={priorityClass(r.severity)}>{r.severity}</Badge>
-                      <span className="text-sm text-foreground font-medium">{r.title}</span>
-                      {r.category && <Badge>{r.category}</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{r.description}</p>
-                    {r.mitigation && (
-                      <p className="text-xs text-foreground/80 mt-1">
-                        <span className="text-emerald-300">Mitigation:</span> {r.mitigation}
-                      </p>
-                    )}
+            {risks.summary && <p className="text-xs text-slate-600 leading-relaxed">{risks.summary}</p>}
+            <div className="space-y-2 mt-2">
+              {(risks.risks || []).map((r, i) => (
+                <div key={i} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-slate-900">{r.title}</span>
+                    <Badge className={priorityClass(r.severity)}>{r.severity}</Badge>
                   </div>
-                ))}
-                {truncate(risks.risks).more > 0 && (
-                  <p className="text-xs text-muted-foreground/70 italic">+{truncate(risks.risks).more} more</p>
-                )}
-              </div>
-            )}
-          </Section>
-        ) : null}
-
-        {/* Team */}
-        {team ? (
-          <Section id="doc-team" title="Team">
-            {!!team.members?.length && (
-              <div className="space-y-2">
-                {truncate(team.members).items.map((m, i) => (
-                  <div key={i} className="bg-card/40 border border-white/5 rounded-lg p-3">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <p className="text-sm text-foreground font-medium">
-                        {m.count}× {m.seniority} {m.role}
-                      </p>
-                      <Badge className="bg-primary/10 text-primary border-primary/30">{m.allocation_pct}%</Badge>
-                    </div>
-                    {!!m.skills?.length && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {m.skills.slice(0, MAX_LIST).map((sk, j) => (
-                          <Badge key={j}>{sk}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {truncate(team.members).more > 0 && (
-                  <p className="text-xs text-muted-foreground/70 italic">+{truncate(team.members).more} more roles</p>
-                )}
-              </div>
-            )}
-            {!!team.staffing_notes?.length && (
-              <div>
-                <SubHead>Staffing Notes</SubHead>
-                <PlainList items={team.staffing_notes} />
-              </div>
-            )}
-          </Section>
-        ) : null}
-
-        {/* Cost */}
-        {cost ? (
-          <Section id="doc-cost" title="Cost">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="bg-primary/10 text-primary border-primary/30">
-                ${Math.round(cost.monthly_total_usd || 0).toLocaleString()}/mo
-              </Badge>
-              <Badge className="bg-secondary/10 text-violet-300 border-secondary/30">
-                ${Math.round(cost.project_total_usd || 0).toLocaleString()} total
-              </Badge>
-              {cost.duration_months ? (
-                <Badge className="bg-white/5 text-muted-foreground border-white/10">
-                  {cost.duration_months} months
-                </Badge>
-              ) : null}
-            </div>
-            {!!cost.lines?.length && (
-              <div className="space-y-1.5">
-                {truncate(cost.lines).items.map((l, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between gap-2 bg-card/40 border border-white/5 rounded px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm text-foreground">{l.category}</p>
-                      {l.notes && <p className="text-xs text-muted-foreground truncate">{l.notes}</p>}
-                    </div>
-                    <p className="text-sm font-semibold text-primary whitespace-nowrap">
-                      ${Math.round(l.monthly_usd).toLocaleString()}/mo
-                    </p>
-                  </div>
-                ))}
-                {truncate(cost.lines).more > 0 && (
-                  <p className="text-xs text-muted-foreground/70 italic">+{truncate(cost.lines).more} more lines</p>
-                )}
-              </div>
-            )}
-          </Section>
-        ) : null}
-
-        {/* Timeline */}
-        {timeline ? (
-          <Section id="doc-timeline" title="Timeline">
-            {timeline.total_duration_weeks ? (
-              <Badge className="bg-primary/10 text-primary border-primary/30">
-                {timeline.total_duration_weeks} weeks total
-              </Badge>
-            ) : null}
-            {!!timeline.milestones?.length && (
-              <div>
-                <SubHead>Milestones</SubHead>
-                <div className="space-y-2">
-                  {truncate(timeline.milestones).items.map((m, i) => (
-                    <div key={i} className="bg-card/40 border border-white/5 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm text-foreground font-medium">{m.title}</span>
-                        <Badge className="bg-secondary/10 text-violet-300 border-secondary/30">{m.phase}</Badge>
-                        <span className="text-[11px] text-muted-foreground">
-                          wk {m.start_week} · {m.duration_weeks}w
-                        </span>
-                      </div>
-                      {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
-                    </div>
-                  ))}
-                  {truncate(timeline.milestones).more > 0 && (
-                    <p className="text-xs text-muted-foreground/70 italic">
-                      +{truncate(timeline.milestones).more} more milestones
+                  <p className="text-slate-600">{r.description}</p>
+                  {r.mitigation && (
+                    <p className="text-slate-700 mt-1 font-medium">
+                      <span className="text-slate-400">Mitigation:</span> {r.mitigation}
                     </p>
                   )}
                 </div>
-              </div>
-            )}
-            {!!timeline.critical_path?.length && (
-              <div>
-                <SubHead>Critical Path</SubHead>
-                <PlainList items={timeline.critical_path} />
-              </div>
-            )}
+              ))}
+            </div>
           </Section>
-        ) : null}
-
-        {/* Integrations */}
-        {integ ? (
-          <Section id="doc-integ" title="Integrations">
-            {!!integ.integrations?.length && (
-              <div className="space-y-2">
-                {truncate(integ.integrations).items.map((it, i) => (
-                  <div key={i} className="bg-card/40 border border-white/5 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm text-foreground font-medium">{it.name}</span>
-                      {it.category && <Badge>{it.category}</Badge>}
-                    </div>
-                    {it.purpose && <p className="text-xs text-muted-foreground">{it.purpose}</p>}
-                  </div>
-                ))}
-                {truncate(integ.integrations).more > 0 && (
-                  <p className="text-xs text-muted-foreground/70 italic">
-                    +{truncate(integ.integrations).more} more
-                  </p>
-                )}
-              </div>
-            )}
-            {!!integ.deployment_plan?.length && (
-              <div>
-                <SubHead>Deployment Plan</SubHead>
-                <PlainList items={integ.deployment_plan} />
-              </div>
-            )}
-            {!!integ.cicd_recommendations?.length && (
-              <div>
-                <SubHead>CI/CD Recommendations</SubHead>
-                <PlainList items={integ.cicd_recommendations} />
-              </div>
-            )}
-          </Section>
-        ) : null}
-
-        {/* Empty placeholder when nothing has generated yet */}
-        {!exec && !req && !arch && !backlog && !risks && !team && !cost && !timeline && !integ && (
-          <div className="flex flex-col items-center justify-center text-center gap-3 py-10">
-            <motion.div
-              animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-            >
-              <Sparkles className="w-8 h-8 text-primary" />
-            </motion.div>
-            <p className="text-muted-foreground">
-              The plan document is being generated by the AI organization.
-            </p>
-          </div>
         )}
       </article>
-    </motion.div>
+    </div>
   )
 }

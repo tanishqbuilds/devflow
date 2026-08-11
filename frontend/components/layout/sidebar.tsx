@@ -4,6 +4,7 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore, type WorkspaceMode } from '@/lib/store'
 import { useProjectStore } from '@/lib/project-store'
+import Link from 'next/link'
 import {
   Activity,
   LayoutDashboard,
@@ -20,6 +21,8 @@ import {
   BookOpen,
   Settings,
   Loader2,
+  ArrowLeft,
+  FolderKanban,
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -87,6 +90,17 @@ export function Sidebar() {
     >
       <div className="flex-1 overflow-y-auto scrollbar-hide p-3 flex flex-col">
         <nav className="space-y-3 mt-1">
+          <div className="mb-2">
+            <Link
+              href="/my-projects"
+              className="w-full px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 hover:bg-blue-50/60 transition-colors border border-transparent"
+              title="Back to all projects"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              {!sidebarCollapsed && <span>All Projects</span>}
+            </Link>
+          </div>
+
           {groups.map((group) => (
             <div key={group.label}>
               {!sidebarCollapsed && (

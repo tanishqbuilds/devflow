@@ -4,10 +4,8 @@ import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, Wand2 } from 'lucide-react'
-import { analyzeProject } from '@/lib/api'
 import { Reveal } from './reveal'
 import { useAppUser, useAppAuth } from '@/lib/auth-context'
-import { useAppStore } from '@/lib/store'
 
 const EXAMPLES = [
   'AI-powered recruitment platform that screens candidates for startups',
@@ -43,22 +41,6 @@ export function InputSection() {
     return () => clearInterval(timer)
   }, [exampleIdx, input])
 
-  if (isClerk && user?.role === 'developer') {
-    return (
-      <section id="plan" className="relative px-4 py-16 sm:py-20 flex justify-center scroll-mt-24">
-        <div className="bg-white border border-slate-200 p-8 text-center max-w-md rounded-2xl shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900">Welcome back!</h2>
-          <p className="text-slate-500 mt-2 text-sm">Head over to your workspace to view your assigned tasks across all projects.</p>
-          <button
-            onClick={() => router.push('/my-tasks')}
-            className="mt-6 bg-blue-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
-          >
-            Go to My Tasks
-          </button>
-        </div>
-      </section>
-    )
-  }
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -75,9 +57,7 @@ export function InputSection() {
     setSubmitting(true)
     setError(null)
     try {
-      const { project_id } = await analyzeProject(idea)
-      useAppStore.getState().setActiveWorkspaceMode('track-live')
-      router.push(`/workspace?project=${project_id}`)
+      router.push(`/projects/new?idea=${encodeURIComponent(idea)}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start. Is the backend running?')
       setSubmitting(false)

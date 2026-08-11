@@ -35,7 +35,10 @@ def get_chat_model(*, model: str, temperature: float, max_tokens: int) -> BaseCh
                 temperature=temperature,
                 max_tokens=max_tokens,
                 request_timeout=LLM_TIMEOUT,
-                max_retries=2,
+                # Retry policy is handled by the workflow engine. Keeping the
+                # provider client retry-free prevents one malformed structured
+                # response from being multiplied into several identical calls.
+                max_retries=0,
             )
         except Exception as exc:
             logger.warning("Failed to initialize ChatGroq, falling back to ChatOpenAI: %s", exc)
@@ -46,7 +49,7 @@ def get_chat_model(*, model: str, temperature: float, max_tokens: int) -> BaseCh
                 temperature=temperature,
                 max_tokens=max_tokens,
                 timeout=LLM_TIMEOUT,
-                max_retries=2,
+                max_retries=0,
             )
 
     if provider == "ollama":

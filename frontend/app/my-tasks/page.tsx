@@ -2,9 +2,9 @@
 
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
-import { listProjects, getProject, updateBacklog } from '@/lib/api'
+import { listProjects, getProject, updateProjectTask } from '@/lib/api'
 import { useAppUser } from '@/lib/auth-context'
-import { Clock, Layers, ListChecks, Link2 } from 'lucide-react'
+import { Clock, Layers, ListChecks, Link2, Plus, FolderKanban } from 'lucide-react'
 import Link from 'next/link'
 import { TopNavbar } from '@/components/layout/top-navbar'
 import { WorkspaceAuthGate } from '@/components/auth/workspace-auth-gate'
@@ -48,7 +48,7 @@ function TasksContent() {
         const fullProject = await getProject(p.id)
         const backlog = fullProject?.backlog
         if (backlog && backlog.tasks) {
-          const myTasks = backlog.tasks.filter((t: any) => t.assignee_id === user.id).map((t: any) => ({
+          const myTasks = backlog.tasks.map((t:any,index:number)=>({...t,_index:index})).filter((t: any) => t.assignee_id === user.id).map((t: any) => ({
              ...t,
              project_id: p.id,
              project_title: p.title || 'Unknown Project',
@@ -81,8 +81,9 @@ function TasksContent() {
       const fullProject = await getProject(project_id)
       if (!fullProject || !fullProject.backlog) return
       
-      const newTasks = fullProject.backlog.tasks.map((t: any) => t.title === title ? { ...t, status } : t)
-      await updateBacklog(project_id, { ...fullProject.backlog, tasks: newTasks })
+      const task=tasks.find(t=>t.title===title&&t.project_id===project_id)
+      if(!task)return
+      await updateProjectTask(project_id,task._index,{status,expected_revision:fullProject.revision||0})
     } catch (err) {
       console.error("Failed to update status", err)
       fetchTasks()
@@ -142,6 +143,20 @@ function TasksContent() {
             Global Kanban board of all tasks assigned to you across Devflow projects.
           </p>
         </div>
+        <div className="flex items-center gap-2.5">
+          <Link href="/my-projects">
+            <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold text-xs transition-colors shadow-xs cursor-pointer">
+              <FolderKanban className="w-4 h-4 text-slate-500" />
+              All Projects
+            </button>
+          </Link>
+          <Link href="/projects/new">
+            <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold text-xs transition-colors shadow-xs cursor-pointer">
+              <Plus className="w-4 h-4" />
+              New Project
+            </button>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -154,9 +169,21 @@ function TasksContent() {
         <div className="p-16 text-center bg-white border border-slate-200 rounded-2xl shadow-xs">
           <ListChecks className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-900">No tasks assigned</h3>
-          <p className="text-slate-500 text-xs mt-1 max-w-sm mx-auto">
-            You don&apos;t have any tasks assigned to your account yet. Assign tasks in project sprint boards.
+          <p className="text-slate-500 text-xs mt-1 max-w-sm mx-auto mb-5">
+            You don&apos;t have any tasks assigned to your account yet. Create a project or assign tasks in project sprint boards.
           </p>
+          <div className="flex items-center justify-center gap-3">
+            <Link href="/projects/new">
+              <button className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer">
+                <Plus className="w-3.5 h-3.5" /> New Project
+              </button>
+            </Link>
+            <Link href="/my-projects">
+              <button className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer">
+                <FolderKanban className="w-3.5 h-3.5 text-slate-500" /> View Projects
+              </button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">

@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { setAuthTokenProvider, syncUser } from './api'
+import { useAuth, useClerk, useUser } from '@clerk/nextjs'
 
 /* ------------------------------------------------------------------ */
 /*  Shared types                                                       */
@@ -23,6 +24,7 @@ interface AuthContextType {
   user: AppUser | null
   signOut: () => Promise<void>
   signIn: () => void
+  signUp: () => void
   updateProfile: (firstName: string, lastName: string, email: string) => void
   isClerk: boolean
   getToken: () => Promise<string | null>
@@ -77,6 +79,7 @@ function BypassAuthProvider({ children }: { children: React.ReactNode }) {
     user,
     signOut: async () => {},
     signIn: () => {},
+    signUp: () => {},
     updateProfile: () => {},
     isClerk: false,
     getToken: tokenProvider,
@@ -92,19 +95,16 @@ function BypassAuthProvider({ children }: { children: React.ReactNode }) {
 function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   // These imports are safe here because this component is only rendered
   // when HAS_CLERK_KEY is true and ClerkProvider is mounted above.
-  const { useAuth, useClerk, useUser } = require('@clerk/nextjs')
   const { user: clerkUser, isSignedIn: clerkIsSignedIn, isLoaded: clerkIsLoaded } = useUser()
   const { getToken: clerkGetToken } = useAuth()
-  const { signOut, openSignIn } = useClerk()
+  const { signOut, openSignIn, openSignUp } = useClerk()
   const [role, setRole] = useState<'manager' | 'developer'>('developer')
-
-  const isBypassed = BYPASS_AUTH || (!clerkUser && clerkIsLoaded)
 
   const activeTokenProvider = useCallback(async () => {
     if (clerkIsSignedIn && clerkUser) {
       return clerkGetToken()
     }
-    return 'demo-bypass-token'
+    return null
   }, [clerkIsSignedIn, clerkUser, clerkGetToken])
 
   useEffect(() => {
@@ -113,18 +113,13 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   }, [activeTokenProvider])
 
   useEffect(() => {
-    const activeUser = (clerkIsSignedIn && clerkUser) ? {
+    if (!clerkIsSignedIn || !clerkUser) return
+    const activeUser = {
       clerk_id: clerkUser.id,
       email: clerkUser.primaryEmailAddress?.emailAddress ?? '',
       first_name: clerkUser.firstName ?? '',
       last_name: clerkUser.lastName ?? '',
       image_url: clerkUser.imageUrl,
-    } : {
-      clerk_id: MOCK_DEMO_USER.id,
-      email: MOCK_DEMO_USER.primaryEmailAddress.emailAddress,
-      first_name: MOCK_DEMO_USER.firstName,
-      last_name: MOCK_DEMO_USER.lastName,
-      image_url: MOCK_DEMO_USER.imageUrl,
     }
 
     syncUser(activeUser).then(res => {
@@ -132,7 +127,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     }).catch(console.error)
   }, [clerkUser, clerkIsSignedIn])
 
-  const activeUser = useMemo<AppUser>(() => {
+  const activeUser = useMemo<AppUser | null>(() => {
     if (clerkIsSignedIn && clerkUser) {
       return {
         id: clerkUser.id,
@@ -144,11 +139,11 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
         role,
       }
     }
-    return { ...MOCK_DEMO_USER, role }
+    return null
   }, [clerkUser, clerkIsSignedIn, role])
 
   const value = useMemo<AuthContextType>(() => ({
-    isSignedIn: true,
+    isSignedIn: !!clerkIsSignedIn,
     isLoaded: clerkIsLoaded ?? true,
     user: activeUser,
     signOut: async () => {
@@ -157,10 +152,11 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     signIn: () => { void openSignIn() },
+    signUp: () => { void openSignUp() },
     updateProfile: () => {},
-    isClerk: !isBypassed,
+    isClerk: true,
     getToken: activeTokenProvider,
-  }), [activeTokenProvider, activeUser, clerkIsLoaded, clerkIsSignedIn, isBypassed, openSignIn, signOut])
+  }), [activeTokenProvider, activeUser, clerkIsLoaded, clerkIsSignedIn, openSignIn, openSignUp, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -204,6 +200,7 @@ export function useAppAuth() {
     userId: context.user?.id ?? null,
     signOut: context.signOut,
     signIn: context.signIn,
+    signUp: context.signUp,
     updateProfile: context.updateProfile,
     isClerk: context.isClerk,
   }

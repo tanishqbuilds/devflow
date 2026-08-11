@@ -37,6 +37,13 @@ SECTION_KEYS = [
 class AnalyzeRequest(BaseModel):
     idea: str = Field(..., min_length=8, max_length=4000)
     title: Optional[str] = Field(default=None, max_length=200)
+    team_size: int = Field(default=4, ge=1, le=200)
+    timeline_weeks: Optional[int] = Field(default=None, ge=1, le=260)
+    budget_usd: Optional[int] = Field(default=None, ge=0)
+    methodology: str = Field(default="Agile", max_length=40)
+    team_skills: list[str] = Field(default_factory=list, max_length=30)
+    priorities: list[str] = Field(default_factory=list, max_length=20)
+    constraints: str = Field(default="", max_length=3000)
 
 
 class AnalyzeResponse(BaseModel):
@@ -59,6 +66,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list)
+    apply_changes: bool = True
 
 
 def migration_idea(source: str, content: str) -> str:
@@ -81,12 +89,13 @@ def _derive_title(idea: str) -> str:
     return (snippet[:60] + "…") if len(snippet) > 60 else snippet
 
 
-def new_project_doc(idea: str, title: Optional[str] = None) -> dict[str, Any]:
+def new_project_doc(idea: str, title: Optional[str] = None, manager_inputs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     now = _now()
     return {
         "id": uuid.uuid4().hex,
         "title": title or _derive_title(idea),
         "idea": idea,
+        "manager_inputs": manager_inputs or {},
         "status": "queued",
         "progress": 0,
         "error": None,

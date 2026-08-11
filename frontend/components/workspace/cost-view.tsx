@@ -5,6 +5,7 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 
 const PALETTE = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#0284c7', '#e11d48', '#4f46e5', '#0d9488']
 
@@ -111,12 +112,18 @@ export function CostView() {
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Detailed Budget Items</h3>
         <div className="space-y-2.5">
           {lines.map((l, i) => (
-            <div key={i} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <div>
-                <p className="text-xs font-bold text-slate-900">{l.category}</p>
-                {l.notes && <p className="text-xs text-slate-500 mt-0.5">{l.notes}</p>}
+            <div key={i} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-900">
+                  <InlineEditable path={`/cost/lines/${i}/category`} value={l.category} />
+                </p>
+                {l.notes && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    <InlineEditable path={`/cost/lines/${i}/notes`} value={l.notes} multiline />
+                  </p>
+                )}
               </div>
-              <p className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">
+              <p className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg shrink-0">
                 {fmt(l.monthly_usd)}/mo
               </p>
             </div>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, ShieldCheck, TrendingDown, ShieldAlert } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 
 const severityClass: Record<string, { bg: string; text: string; border: string }> = {
   critical: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
@@ -22,7 +23,13 @@ export function RiskView() {
       <div>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Security & Delivery Risk Assessment</h2>
         <p className="text-slate-500 text-sm mt-0.5">
-          {riskData ? `Overall project risk profile: ${riskData.overall_risk_level}` : 'Security and technical debt analysis'}
+          {riskData ? (
+            <span>
+              Overall project risk profile: <InlineEditable path="/risks/overall_risk_level" value={riskData.overall_risk_level} className="font-semibold text-slate-900" />
+            </span>
+          ) : (
+            'Security and technical debt analysis'
+          )}
         </p>
       </div>
 
@@ -33,7 +40,7 @@ export function RiskView() {
           {riskData.summary && (
             <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs text-xs text-slate-700 leading-relaxed">
               <strong className="text-slate-900 block mb-1 uppercase tracking-wider text-[11px]">Executive Threat Summary</strong>
-              {riskData.summary}
+              <InlineEditable path="/risks/summary" value={riskData.summary} multiline />
             </div>
           )}
 
@@ -67,19 +74,25 @@ export function RiskView() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <h4 className="font-bold text-sm text-slate-900">{risk.title}</h4>
+                        <h4 className="font-bold text-sm text-slate-900 flex-1">
+                          <InlineEditable path={`/risks/risks/${idx}/title`} value={risk.title} />
+                        </h4>
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${tone.bg} ${tone.border} ${tone.text}`}>
                           {risk.severity}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 mb-3 leading-relaxed">{risk.description}</p>
+                      <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+                        <InlineEditable path={`/risks/risks/${idx}/description`} value={risk.description} multiline />
+                      </p>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                         <Bar label="Probability" value={risk.probability} />
                         <Bar label="Impact" value={risk.impact} />
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Category</p>
-                          <p className="text-xs font-semibold text-slate-700 capitalize mt-1">{risk.category}</p>
+                          <p className="text-xs font-semibold text-slate-700 capitalize mt-1">
+                            <InlineEditable path={`/risks/risks/${idx}/category`} value={risk.category} />
+                          </p>
                         </div>
                       </div>
 
@@ -87,7 +100,9 @@ export function RiskView() {
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-1">
                           <TrendingDown className="w-3.5 h-3.5 text-blue-600" /> Recommended Mitigation Plan
                         </p>
-                        <p className="text-xs text-slate-800 leading-relaxed font-medium">{risk.mitigation}</p>
+                        <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                          <InlineEditable path={`/risks/risks/${idx}/mitigation`} value={risk.mitigation} multiline />
+                        </p>
                       </div>
                     </div>
                   </div>

@@ -20,6 +20,7 @@ class Settings:
     clerk_secret_key: str = os.getenv("CLERK_SECRET_KEY", "")
     clerk_issuer_url: str = os.getenv("CLERK_ISSUER_URL", "").rstrip("/")
     bypass_auth: bool = os.getenv("BYPASS_AUTH", "true").lower() in ("true", "1", "yes")
+    unlimited_credentials: bool = os.getenv("UNLIMITED_CREDENTIALS", "false").lower() in ("true", "1", "yes")
 
     # Orchestration
     analyze_queue: str = "queue:analyze"

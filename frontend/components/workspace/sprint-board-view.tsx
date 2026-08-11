@@ -4,8 +4,8 @@ import { motion } from 'framer-motion'
 import { LayoutGrid, Clock, Layers, Link2, Gauge, UserCircle2 } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { useEffect, useState } from 'react'
-import { getUsers, updateBacklog } from '@/lib/api'
-import { useAppUser } from '@/lib/auth-context'
+import { getProjectMembers, updateProjectTask } from '@/lib/api'
+import { InlineEditable } from './workspace-editor'
 
 const priorityPill: Record<string, string> = {
   critical: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -26,14 +26,14 @@ export function SprintBoardView() {
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
   const backlog = project?.backlog || null
-  const { user: currentUser } = useAppUser()
 
   const [viewMode, setViewMode] = useState<'sprint' | 'kanban'>('kanban')
   const [users, setUsers] = useState<any[]>([])
+  const [workspaceRole,setWorkspaceRole]=useState('viewer')
   
   useEffect(() => {
-    getUsers().then(res => setUsers(res.users || [])).catch(console.error)
-  }, [])
+    if(project?.id)getProjectMembers(project.id).then(res=>{setUsers(res.members||[]);setWorkspaceRole(res.role)}).catch(console.error)
+  }, [project?.id])
 
   if (!backlog) {
     return (
@@ -59,18 +59,19 @@ export function SprintBoardView() {
   const sprints = [...(backlog.sprints || [])].sort((a, b) => a.number - b.number)
 
   // Ensure tasks have statuses
-  const normalizedTasks = tasks.map((t: any) => ({ ...t, status: t.status || 'To Do' }))
+  const normalizedTasks = tasks.map((t: any,index:number) => ({ ...t, status: t.status || 'To Do',_index:index }))
 
-  const updateTask = async (taskTitle: string, updates: Partial<any>) => {
+  const updateTask = async (taskIndex: number, updates: Partial<any>) => {
     if (!project) return
-    const newTasks = normalizedTasks.map((t: any) => t.title === taskTitle ? { ...t, ...updates } : t)
+    const newTasks = tasks.map((t: any,index:number) => index === taskIndex ? { ...t, ...updates } : t)
     const newBacklog = { ...backlog, tasks: newTasks }
     
     // Optimistic UI update
     setProject({ ...project, backlog: newBacklog })
     
     try {
-      await updateBacklog(project.id, newBacklog)
+      const result=await updateProjectTask(project.id,taskIndex,{...updates,expected_revision:project.revision||0})
+      if(result.project)setProject(result.project)
     } catch (err) {
       console.error("Failed to update task", err)
       // Rollback
@@ -80,9 +81,9 @@ export function SprintBoardView() {
 
   const handleDrop = (e: React.DragEvent, status: string) => {
     e.preventDefault()
-    const taskTitle = e.dataTransfer.getData('text/plain')
-    if (taskTitle) {
-      updateTask(taskTitle, { status })
+    const taskIndex = Number(e.dataTransfer.getData('text/plain'))
+    if (Number.isInteger(taskIndex)) {
+      updateTask(taskIndex, { status })
     }
   }
 
@@ -92,11 +93,13 @@ export function SprintBoardView() {
       <div
         key={`${task.title}-${idx}`}
         draggable
-        onDragStart={(e: any) => e.dataTransfer.setData('text/plain', task.title)}
+        onDragStart={(e: any) => e.dataTransfer.setData('text/plain', String(task._index))}
         className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing shadow-xs"
       >
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-xs text-slate-900 leading-snug">{task.title}</p>
+          <p className="font-semibold text-xs text-slate-900 leading-snug flex-1">
+            <InlineEditable path={`/backlog/tasks/${task._index}/title`} value={task.title} />
+          </p>
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 capitalize ${priorityPill[task.priority] || priorityPill.medium}`}>
             {task.priority || 'medium'}
           </span>
@@ -123,12 +126,12 @@ export function SprintBoardView() {
             <select 
               className="bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-600 hover:text-slate-900 cursor-pointer outline-none px-2 py-0.5 max-w-[130px] truncate"
               value={task.assignee_id || ''}
-              onChange={(e) => updateTask(task.title, { assignee_id: e.target.value })}
-              disabled={currentUser?.role === 'developer' && task.assignee_id && task.assignee_id !== currentUser.id}
+              onChange={(e) => updateTask(task._index, { assignee_id: e.target.value || null })}
+              disabled={!['owner','admin','editor'].includes(workspaceRole)}
             >
               <option value="">Unassigned</option>
               {users.map(u => (
-                <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+                <option key={u.user_id} value={u.user_id}>{u.first_name} {u.last_name}</option>
               ))}
             </select>
           </div>

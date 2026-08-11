@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { FolderKanban, Plus } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useProjectStore } from '@/lib/project-store'
 import { useOrchestrationStream } from '@/lib/use-orchestration-stream'
@@ -18,22 +20,28 @@ import { SprintBoardView } from './sprint-board-view'
 import { InsightsView } from './insights-view'
 import { DocumentationView } from './documentation-view'
 import { OrchestrationLoader } from './orchestration-loader'
+import { WorkspaceEditProvider } from './workspace-editor'
 
 export function WorkspaceClient() {
+  const router = useRouter()
   const { activeWorkspaceMode, setActiveWorkspaceMode, setProjectTitle, setProjectDescription } = useAppStore()
   const setProjectId = useProjectStore((s) => s.setProjectId)
   const reset = useProjectStore((s) => s.reset)
-  const status = useProjectStore((s) => s.status)
   const project = useProjectStore((s) => s.project)
 
-  const projectId = useSearchParams().get('project')
+  const searchParams = useSearchParams()
+  const projectId = searchParams?.get('project')
 
   useEffect(() => {
+    if (!projectId) {
+      router.replace('/my-projects')
+      return
+    }
     reset()
     setProjectId(projectId)
-  }, [projectId, reset, setProjectId])
+  }, [projectId, reset, setProjectId, router])
 
-  useOrchestrationStream(projectId)
+  useOrchestrationStream(projectId || null)
 
   useEffect(() => {
     if (!project) return
@@ -42,6 +50,31 @@ export function WorkspaceClient() {
     const desc = project.executive_summary?.tagline || project.executive_summary?.overview || project.idea
     if (desc) setProjectDescription(desc)
   }, [project, setProjectTitle, setProjectDescription])
+
+  if (!projectId) {
+    return (
+      <div className="py-24 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto mb-4 shadow-xs">
+          <FolderKanban className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">No project selected</h2>
+        <p className="text-slate-500 text-sm mt-1 mb-6">Select a project from your account or plan a new one.</p>
+        <div className="flex items-center justify-center gap-3">
+          <Link href="/my-projects">
+            <button className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer">
+              Go to My Projects
+            </button>
+          </Link>
+          <Link href="/projects/new">
+            <button className="px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" />
+              New Project
+            </button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const renderView = () => {
     switch (activeWorkspaceMode) {
@@ -80,8 +113,8 @@ export function WorkspaceClient() {
   }
 
   return (
-    <div className="w-full">
-      {renderView()}
-    </div>
+    <WorkspaceEditProvider>
+      <div className="w-full">{renderView()}</div>
+    </WorkspaceEditProvider>
   )
 }

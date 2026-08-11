@@ -1,7 +1,7 @@
 // Types mirroring the backend project document. Fields are optional because a
 // document is filled in progressively as agents complete.
 
-export type NodeStatus = 'idle' | 'thinking' | 'analyzing' | 'generating' | 'complete'
+export type NodeStatus = 'idle' | 'thinking' | 'analyzing' | 'generating' | 'complete' | 'failed'
 
 export interface OrchestrationNodeState {
   status: NodeStatus
@@ -29,6 +29,8 @@ export interface ExecutiveSummary {
   complexity_label: string
   estimated_duration_weeks: number
   recommended_team_size: number
+  competitive_landscape?: string
+  go_to_market?: string
 }
 
 export interface RequirementItem {
@@ -192,6 +194,17 @@ export interface ProjectDoc {
   error: string | null
   created_at: string
   updated_at: string
+  revision?: number
+  workspace_id?: string
+  manager_inputs?: {
+    team_size?: number
+    timeline_weeks?: number | null
+    budget_usd?: number | null
+    methodology?: string
+    team_skills?: string[]
+    priorities?: string[]
+    constraints?: string
+  }
   orchestration: {
     current_node: string | null
     nodes: Record<string, OrchestrationNodeState>
@@ -206,6 +219,12 @@ export interface ProjectDoc {
   cost: CostPlan | null
   timeline: TimelinePlan | null
   integrations: IntegrationBundle | null
+  insights?: {
+    health_rationale?: string
+    assumptions?: string[]
+    dependencies?: string[]
+    recommendations?: string[]
+  } | null
 }
 
 export type OrchestrationEvent =
@@ -216,6 +235,7 @@ export type OrchestrationEvent =
   | { type: 'section_complete'; agent: string; section: string; node: string; data: any; seq: number }
   | { type: 'progress'; progress: number; seq: number }
   | { type: 'run_complete'; progress: number; seq: number }
+  | { type: 'run_failed'; message:string; missing_sections:string[]; seq:number }
   | { type: 'error'; node?: string; agent?: string; message: string; seq?: number }
   | { type: 'supervisor_review'; round: number; passed: boolean; assessment: string; directives_count: number; seq?: number }
   | { type: 'supervisor_directive'; agent: string; reason: string; round: number; seq?: number }

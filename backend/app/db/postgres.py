@@ -34,7 +34,44 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'editor', 'viewer')),
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (workspace_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS workspace_invites (
+    token TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'viewer')),
+    created_by TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    accepted_by TEXT REFERENCES users(clerk_user_id),
+    accepted_at TIMESTAMPTZ
+);
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS projects_user_created_idx ON projects(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS projects_workspace_created_idx ON projects(workspace_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS project_revisions (
+    id BIGSERIAL PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    actor_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+    revision INTEGER NOT NULL,
+    operation TEXT NOT NULL,
+    path TEXT,
+    before_document JSONB NOT NULL,
+    after_document JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(project_id, revision)
+);
+CREATE INDEX IF NOT EXISTS project_revisions_project_idx ON project_revisions(project_id, revision DESC);
 CREATE TABLE IF NOT EXISTS ai_responses (
     id BIGSERIAL PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

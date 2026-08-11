@@ -3,7 +3,29 @@
 // the host-published port, regardless of where the frontend itself runs.
 import type { ProjectDoc } from './project-types'
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '')
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL?.replace(/\/$/, '')
+
+function requiredUrl(value: string | undefined, variableName: string): string {
+  if (!value) throw new Error(`${variableName} must be set in the environment`)
+  return value
+}
+
+const endpoint = {
+  agents: () => `${apiBase()}/agents`,
+  projects: () => `${apiBase()}/projects`,
+  project: (projectId: string) => `${apiBase()}/projects/${projectId}`,
+  projectAction: (projectId: string, action: string) =>
+    `${apiBase()}/projects/${projectId}/${action}`,
+  projectTask: (projectId: string, index: number) =>
+    `${apiBase()}/projects/${projectId}/tasks/${index}`,
+  users: () => `${apiBase()}/users`,
+  userSync: () => `${apiBase()}/users/sync`,
+  workspaces: () => `${apiBase()}/workspaces`,
+  workspaceInvites: (workspaceId: string) => `${apiBase()}/workspaces/${workspaceId}/invites`,
+  acceptWorkspaceInvite: (token: string) => `${apiBase()}/workspaces/invites/${token}/accept`,
+}
+
 let tokenProvider: (() => Promise<string | null>) | null = null
 
 export function setAuthTokenProvider(provider: (() => Promise<string | null>) | null) {
@@ -23,13 +45,11 @@ async function authHeaders(json = false): Promise<HeadersInit> {
 }
 
 export function apiBase(): string {
-  return API_BASE
+  return requiredUrl(API_BASE_URL, 'NEXT_PUBLIC_API_URL')
 }
 
 export function wsBase(): string {
-  const explicit = process.env.NEXT_PUBLIC_WS_URL
-  if (explicit) return explicit.replace(/\/$/, '')
-  return API_BASE.replace(/^http/, 'ws')
+  return requiredUrl(WS_BASE_URL, 'NEXT_PUBLIC_WS_URL')
 }
 
 export function streamUrl(projectId: string, token: string): string {
@@ -54,11 +74,12 @@ async function jsonOrThrow(res: Response) {
 export async function analyzeProject(
   idea: string,
   title?: string,
+  managerInputs: Record<string, unknown> = {},
 ): Promise<{ project_id: string; status: string }> {
-  const res = await fetch(`${API_BASE}/projects/analyze`, {
+  const res = await fetch(`${endpoint.projects()}/analyze`, {
     method: 'POST',
     headers: await authHeaders(true),
-    body: JSON.stringify({ idea, title }),
+    body: JSON.stringify({ idea, title, ...managerInputs }),
   })
   return jsonOrThrow(res)
 }
@@ -66,7 +87,7 @@ export async function analyzeProject(
 export async function retryProject(
   projectId: string,
 ): Promise<{ project_id: string; status: string }> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/retry`, {
+  const res = await fetch(endpoint.projectAction(projectId, 'retry'), {
     method: 'POST',
     headers: await authHeaders(true),
   })
@@ -85,7 +106,7 @@ export async function migrateProject(payload: {
   content: string
   title?: string
 }): Promise<{ project_id: string; status: string }> {
-  const res = await fetch(`${API_BASE}/projects/migrate`, {
+  const res = await fetch(`${endpoint.projects()}/migrate`, {
     method: 'POST',
     headers: await authHeaders(true),
     body: JSON.stringify(payload),
@@ -98,8 +119,8 @@ export async function askAssistant(
   projectId: string,
   message: string,
   history: { role: 'user' | 'assistant'; content: string }[] = [],
-): Promise<{ reply: string }> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/chat`, {
+): Promise<{ reply: string; edits?: {path:string;value:any}[]; project?: ProjectDoc }> {
+  const res = await fetch(endpoint.projectAction(projectId, 'chat'), {
     method: 'POST',
     headers: await authHeaders(true),
     body: JSON.stringify({ message, history }),
@@ -107,20 +128,36 @@ export async function askAssistant(
   return jsonOrThrow(res)
 }
 
+export async function editProjectContent(projectId:string,path:string,value:any,expectedRevision?:number):Promise<{project:ProjectDoc}>{
+  const res=await fetch(endpoint.projectAction(projectId, 'content'),{method:'PATCH',headers:await authHeaders(true),body:JSON.stringify({path,value,expected_revision:expectedRevision})})
+  return jsonOrThrow(res)
+}
+export async function undoProject(projectId:string):Promise<{project:ProjectDoc}>{
+  const res=await fetch(endpoint.projectAction(projectId, 'undo'),{method:'POST',headers:await authHeaders(true)})
+  return jsonOrThrow(res)
+}
+export async function projectHistory(projectId:string):Promise<{history:any[]}>{
+  const res=await fetch(endpoint.projectAction(projectId, 'history'),{headers:await authHeaders()}); return jsonOrThrow(res)
+}
+export async function listWorkspaces(){const res=await fetch(endpoint.workspaces(),{headers:await authHeaders()});return jsonOrThrow(res)}
+export async function createWorkspace(name:string){const res=await fetch(endpoint.workspaces(),{method:'POST',headers:await authHeaders(true),body:JSON.stringify({name})});return jsonOrThrow(res)}
+export async function createWorkspaceInvite(id:string,role:'admin'|'editor'|'viewer'){const res=await fetch(endpoint.workspaceInvites(id),{method:'POST',headers:await authHeaders(true),body:JSON.stringify({role})});return jsonOrThrow(res)}
+export async function acceptWorkspaceInvite(token:string){const res=await fetch(endpoint.acceptWorkspaceInvite(token),{method:'POST',headers:await authHeaders(true)});return jsonOrThrow(res)}
+
 export async function getProject(projectId: string): Promise<ProjectDoc> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}`, {
+  const res = await fetch(endpoint.project(projectId), {
     cache: 'no-store', headers: await authHeaders(),
   })
   return jsonOrThrow(res)
 }
 
 export async function listProjects(): Promise<{ projects: Partial<ProjectDoc>[] }> {
-  const res = await fetch(`${API_BASE}/projects`, { cache: 'no-store', headers: await authHeaders() })
+  const res = await fetch(endpoint.projects(), { cache: 'no-store', headers: await authHeaders() })
   return jsonOrThrow(res)
 }
 
 export async function getAgents(): Promise<{ agents: { id: string; name: string; role: string; node: string }[] }> {
-  const res = await fetch(`${API_BASE}/agents`, { cache: 'no-store' })
+  const res = await fetch(endpoint.agents(), { cache: 'no-store' })
   return jsonOrThrow(res)
 }
 
@@ -131,7 +168,7 @@ export async function syncUser(payload: {
   last_name: string
   image_url: string
 }): Promise<any> {
-  const res = await fetch(`${API_BASE}/users/sync`, {
+  const res = await fetch(endpoint.userSync(), {
     method: 'POST',
     headers: await authHeaders(true),
     body: JSON.stringify(payload),
@@ -140,15 +177,17 @@ export async function syncUser(payload: {
 }
 
 export async function getUsers(): Promise<{ users: any[] }> {
-  const res = await fetch(`${API_BASE}/users`, { cache: 'no-store', headers: await authHeaders() })
+  const res = await fetch(endpoint.users(), { cache: 'no-store', headers: await authHeaders() })
   return jsonOrThrow(res)
 }
 
 export async function updateBacklog(projectId: string, backlog: any): Promise<{ status: string }> {
-  const res = await fetch(`${API_BASE}/projects/${projectId}/backlog`, {
+  const res = await fetch(endpoint.projectAction(projectId, 'backlog'), {
     method: 'PUT',
     headers: await authHeaders(true),
     body: JSON.stringify({ backlog }),
   })
   return jsonOrThrow(res)
 }
+export async function getProjectMembers(projectId:string):Promise<{members:any[];role:'owner'|'admin'|'editor'|'viewer'}>{const res=await fetch(endpoint.projectAction(projectId, 'members'),{headers:await authHeaders()});return jsonOrThrow(res)}
+export async function updateProjectTask(projectId:string,index:number,payload:{assignee_id?:string|null;status?:string;expected_revision?:number}){const res=await fetch(endpoint.projectTask(projectId, index),{method:'PATCH',headers:await authHeaders(true),body:JSON.stringify(payload)});return jsonOrThrow(res)}

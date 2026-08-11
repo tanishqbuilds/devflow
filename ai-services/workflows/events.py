@@ -65,6 +65,9 @@ class EventEmitter:
     async def run_complete(self) -> None:
         await self._publish({"type": "run_complete", "progress": 100})
 
+    async def run_failed(self, missing_sections:list[str]) -> None:
+        await self._publish({"type":"run_failed","missing_sections":missing_sections,"message":"Required sections remain incomplete"})
+
     async def error(self, node: str, agent: str, message: str) -> None:
         await self._publish({"type": "error", "node": node, "agent": agent, "message": message})
 

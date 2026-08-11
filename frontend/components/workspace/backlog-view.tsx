@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Clock, Layers, Flag, Calendar } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 
 const priorityClass: Record<string, string> = {
   high: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -48,8 +49,12 @@ export function BacklogView() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {backlog.epics.map((epic, idx) => (
               <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <p className="font-semibold text-xs text-slate-900">{epic.title}</p>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">{epic.description}</p>
+                <p className="font-semibold text-xs text-slate-900">
+                  <InlineEditable path={`/backlog/epics/${idx}/title`} value={epic.title} />
+                </p>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  <InlineEditable path={`/backlog/epics/${idx}/description`} value={epic.description} multiline />
+                </p>
               </div>
             ))}
           </div>
@@ -57,53 +62,64 @@ export function BacklogView() {
       )}
 
       {/* Sprints & Tasks */}
-      {sprints.map((sprint) => {
+      {sprints.map((sprint, sIdx) => {
         const sprintTasks = tasks.filter((t) => t.sprint === sprint.number)
         return (
           <div key={sprint.number} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Flag className="w-4 h-4 text-blue-600" /> Sprint {sprint.number}: {sprint.name}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 gap-2">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 flex-1">
+                <Flag className="w-4 h-4 text-blue-600" /> Sprint {sprint.number}:{' '}
+                <InlineEditable path={`/backlog/sprints/${sIdx}/name`} value={sprint.name} />
               </h3>
-              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full shrink-0">
                 {sprintTasks.length} tasks
               </span>
             </div>
             {sprint.goal && (
-              <p className="text-xs text-slate-600 mb-4 bg-slate-50 border border-slate-200/80 rounded-lg p-3">
-                <strong className="text-slate-900">Sprint Goal:</strong> {sprint.goal}
-              </p>
+              <div className="text-xs text-slate-600 mb-4 bg-slate-50 border border-slate-200/80 rounded-lg p-3">
+                <strong className="text-slate-900 block mb-1">Sprint Goal:</strong>
+                <InlineEditable path={`/backlog/sprints/${sIdx}/goal`} value={sprint.goal} multiline />
+              </div>
             )}
 
             <div className="space-y-3">
-              {sprintTasks.map((task, idx) => (
-                <div key={idx} className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-xs text-slate-900">{task.title}</p>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">{task.description}</p>
-                      <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" /> {task.estimated_days} dev-days
-                        </span>
-                        {task.category && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                            {task.category}
+              {sprintTasks.map((task, tIdx) => {
+                const globalTaskIdx = tasks.findIndex((t) => t.title === task.title)
+                const taskPath = globalTaskIdx >= 0 ? `/backlog/tasks/${globalTaskIdx}` : `/backlog/tasks/${tIdx}`
+                return (
+                  <div key={tIdx} className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl hover:border-slate-300 transition-all">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-xs text-slate-900">
+                          <InlineEditable path={`${taskPath}/title`} value={task.title} />
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          <InlineEditable path={`${taskPath}/description`} value={task.description} multiline />
+                        </p>
+                        <div className="flex items-center gap-3 mt-2.5 flex-wrap">
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <InlineEditable path={`${taskPath}/estimated_days`} value={task.estimated_days} /> dev-days
                           </span>
-                        )}
-                        {task.epic && (
-                          <span className="text-[11px] font-medium text-blue-600">
-                            Epic: {task.epic}
-                          </span>
-                        )}
+                          {task.category && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                              <InlineEditable path={`${taskPath}/category`} value={task.category} />
+                            </span>
+                          )}
+                          {task.epic && (
+                            <span className="text-[11px] font-medium text-blue-600">
+                              Epic: <InlineEditable path={`${taskPath}/epic`} value={task.epic} />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${priorityClass[task.priority] || priorityClass.medium}`}>
+                        {task.priority.toUpperCase()}
                       </div>
                     </div>
-                    <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${priorityClass[task.priority] || priorityClass.medium}`}>
-                      {task.priority.toUpperCase()}
-                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {sprintTasks.length === 0 && (
                 <p className="text-xs text-slate-400 italic">No tasks assigned to this sprint.</p>
               )}

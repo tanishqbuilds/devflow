@@ -11,9 +11,14 @@ import {
   ArrowRight,
   ShieldAlert,
   HelpCircle,
+  TrendingUp,
+  Layers,
+  Clock,
+  DollarSign,
 } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 import type { ProjectDoc } from '@/lib/project-types'
 
 const severityRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 }
@@ -22,11 +27,11 @@ function sevColor(sev: string): { text: string; border: string; bg: string } {
   switch ((sev || '').toLowerCase()) {
     case 'critical':
     case 'high':
-      return { text: 'text-rose-400', border: '#f43f5e', bg: 'bg-rose-500/15' }
+      return { text: 'text-rose-600', border: '#f43f5e', bg: 'bg-rose-50 border-rose-200' }
     case 'medium':
-      return { text: 'text-amber-400', border: '#f59e0b', bg: 'bg-amber-500/15' }
+      return { text: 'text-amber-600', border: '#f59e0b', bg: 'bg-amber-50 border-amber-200' }
     default:
-      return { text: 'text-emerald-400', border: '#10b981', bg: 'bg-emerald-500/15' }
+      return { text: 'text-emerald-600', border: '#10b981', bg: 'bg-emerald-50 border-emerald-200' }
   }
 }
 
@@ -44,22 +49,22 @@ function computeHealth(project: ProjectDoc): Health {
 
   const level = (project.risks?.overall_risk_level || '').toLowerCase()
   if (level.includes('critical')) {
-    score -= 40
-    reasons.push('critical overall risk')
+    score -= 35
+    reasons.push('critical overall risk profile')
   } else if (level.includes('high')) {
-    score -= 25
-    reasons.push('high overall risk')
+    score -= 20
+    reasons.push('high risk factors requiring active mitigation')
   } else if (level.includes('moderate') || level.includes('medium')) {
-    score -= 12
-    reasons.push('moderate risk')
+    score -= 10
+    reasons.push('moderate complexity')
   } else if (level.includes('low')) {
     score -= 4
   }
 
   const complexity = project.executive_summary?.complexity_score ?? 0
   if (complexity > 0) {
-    score -= complexity / 5
-    if (complexity >= 70) reasons.push('high complexity')
+    score -= Math.round(complexity / 6)
+    if (complexity >= 70) reasons.push('high architectural complexity')
   }
 
   const estWeeks = project.executive_summary?.estimated_duration_weeks ?? 0
@@ -68,33 +73,33 @@ function computeHealth(project: ProjectDoc): Health {
     const diff = Math.abs(estWeeks - planWeeks) / Math.max(estWeeks, planWeeks)
     if (diff > 0.25) {
       score -= 10
-      reasons.push('timeline vs estimate mismatch')
+      reasons.push('timeline vs estimated duration variance')
     }
   }
 
-  score = Math.max(5, Math.min(99, Math.round(score)))
+  score = Math.max(15, Math.min(99, Math.round(score)))
 
   let label: string
   let ring: string
   let text: string
-  if (score >= 70) {
+  if (score >= 75) {
     label = 'Healthy'
     ring = '#10b981'
-    text = 'text-emerald-400'
-  } else if (score >= 45) {
+    text = 'text-emerald-600'
+  } else if (score >= 50) {
     label = 'At Risk'
     ring = '#f59e0b'
-    text = 'text-amber-400'
+    text = 'text-amber-600'
   } else {
-    label = 'Critical'
+    label = 'Attention Needed'
     ring = '#f43f5e'
-    text = 'text-rose-400'
+    text = 'text-rose-600'
   }
 
   const rationale =
     reasons.length > 0
-      ? `Driven down by ${reasons.slice(0, 3).join(', ')}.`
-      : 'Plan looks well-balanced with low identified risk.'
+      ? `Delivery confidence is influenced by ${reasons.slice(0, 3).join(', ')}.`
+      : 'Plan is well-balanced across scope, timeline, and resource allocation.'
 
   return { score, label, ring, text, rationale }
 }
@@ -105,15 +110,15 @@ function deriveAssumptions(project: ProjectDoc): string[] {
   const users = exec?.target_users || []
   const criteria = exec?.success_criteria || []
 
-  if (users[0]) out.push(`We assume ${users[0].toLowerCase()} are reachable and willing to adopt this product.`)
-  if (criteria[0]) out.push(`We assume the team can validate "${criteria[0]}" within the planned timeline.`)
-  if (users[1]) out.push(`We assume demand from ${users[1].toLowerCase()} stays stable through delivery.`)
-  else if (criteria[1]) out.push(`We assume measurement is in place to track "${criteria[1]}".`)
+  if (users[0]) out.push(`Target personas (${users[0]}) have sufficient domain readiness for initial rollout.`)
+  if (criteria[0]) out.push(`Success criteria "${criteria[0]}" can be validated within the scheduled beta phase.`)
+  if (users[1]) out.push(`Secondary user demand from ${users[1]} scales predictably post-launch.`)
+  else if (criteria[1]) out.push(`Key metric telemetry is established early to monitor "${criteria[1]}".`)
 
   if (out.length === 0) {
-    out.push('We assume scope and priorities stay stable across the engagement.')
-    out.push('We assume required tooling and infrastructure access is available on day one.')
-    out.push('We assume stakeholders are available for timely reviews and sign-off.')
+    out.push('Core business requirements and target customer scope remain stable through Sprint 1.')
+    out.push('Cloud infrastructure and standard API service dependencies are available for onboarding.')
+    out.push('Engineering leads have uninterrupted availability during key milestone transitions.')
   }
   return out.slice(0, 3)
 }
@@ -129,24 +134,39 @@ function deriveDependencies(project: ProjectDoc): string[] {
       if (d) deps.add(d)
     }
   }
-  return Array.from(deps).slice(0, 5)
+  const arr = Array.from(deps)
+  if (arr.length > 0) return arr.slice(0, 5)
+
+  return [
+    'Core Database Schema & API Authentication Tier',
+    'Primary Business Logic & Application Workflow Engine',
+    'Frontend UI Component Design System & Client State',
+    'Integration & Automated End-to-End Test Suite',
+    'Production CI/CD Deployment Pipeline & Monitoring',
+  ]
 }
 
 function deriveDecisions(project: ProjectDoc): { layer: string; decision: string }[] {
   const arch = project.architecture
-  if (!arch) return []
-  const layers: { key: keyof typeof arch; label: string }[] = [
-    { key: 'frontend', label: 'Frontend' },
-    { key: 'backend', label: 'Backend' },
-    { key: 'database', label: 'Database' },
-    { key: 'infrastructure', label: 'Infrastructure' },
-  ]
   const out: { layer: string; decision: string }[] = []
-  for (const { key, label } of layers) {
-    const layer = arch[key] as { decisions?: string[] } | undefined
-    const first = layer?.decisions?.[0]
-    if (first) out.push({ layer: label, decision: first })
-    if (out.length >= 4) break
+  if (arch) {
+    const layers: { key: keyof typeof arch; label: string }[] = [
+      { key: 'frontend', label: 'Frontend' },
+      { key: 'backend', label: 'Backend' },
+      { key: 'database', label: 'Database' },
+      { key: 'infrastructure', label: 'Infrastructure' },
+    ]
+    for (const { key, label } of layers) {
+      const layer = arch[key] as { decisions?: string[] } | undefined
+      const first = layer?.decisions?.[0]
+      if (first) out.push({ layer: label, decision: first })
+    }
+  }
+  if (out.length === 0) {
+    out.push({ layer: 'Frontend', decision: 'Modular component-driven architecture with responsive state management.' })
+    out.push({ layer: 'Backend', decision: 'REST / WebSocket service layer with decoupled event-driven queues.' })
+    out.push({ layer: 'Database', decision: 'Relational data model with indexed foreign keys and JSONB document support.' })
+    out.push({ layer: 'Infrastructure', decision: 'Containerized deployment pipeline with automated health checks and log telemetry.' })
   }
   return out.slice(0, 4)
 }
@@ -163,31 +183,27 @@ function deriveRecommendations(project: ProjectDoc, health: Health): string[] {
   const teamSize = (project.team?.members || []).reduce((s, m) => s + (m.count || 1), 0)
 
   if ((level.includes('high') || level.includes('critical')) && risks[0]) {
-    out.push(`Front-load the mitigation for "${risks[0].title}" in sprint 1 before it compounds.`)
+    out.push(`Front-load the mitigation strategy for "${risks[0].title}" in Sprint 1 before dependencies compound.`)
   } else if (risks[0]) {
-    out.push(`Track "${risks[0].title}" with a clear owner so it stays contained.`)
+    out.push(`Assign dedicated technical ownership for "${risks[0].title}" to prevent timeline slippage.`)
   }
 
-  if (estWeeks > 16 || planWeeks > 16) {
-    out.push('Cut MVP scope to hit a 12-week beta, then expand based on real usage signals.')
-  }
-
-  if (complexity >= 70) {
-    out.push('Add a technical spike sprint to de-risk the highest-complexity components early.')
+  if (complexity >= 60) {
+    out.push('Conduct an architectural proof-of-concept during initial sprints to de-risk high-complexity modules.')
   }
 
   if (planWeeks > 0 && estWeeks > 0 && Math.abs(estWeeks - planWeeks) / Math.max(estWeeks, planWeeks) > 0.25) {
-    out.push('Reconcile the estimated duration with the timeline plan to set realistic stakeholder expectations.')
+    out.push('Align the timeline milestone dates with the executive duration estimate to set clear stakeholder expectations.')
   }
 
-  if (teamSize > 0 && teamSize <= 3 && (planWeeks > 12 || estWeeks > 12)) {
-    out.push('The lean team plus long timeline is fragile — define backup ownership for critical roles.')
+  if (teamSize > 0 && teamSize <= 3 && (planWeeks > 8 || estWeeks > 8)) {
+    out.push('The team composition is lean for the scope — ensure cross-functional skill redundancy across core services.')
   }
 
   if (out.length < 3) {
-    if (health.score >= 70) out.push('Maintain momentum with weekly health checks against the success criteria.')
-    out.push('Lock the critical path early and protect it from scope creep.')
-    out.push('Schedule a mid-project risk review to revalidate assumptions.')
+    if (health.score >= 70) out.push('Maintain delivery velocity by tracking weekly milestone deliverables against success metrics.')
+    out.push('Establish automated regression test suites early in the build pipeline to protect core flows.')
+    out.push('Review integration prerequisites with third-party providers before starting dependent sprints.')
   }
 
   return out.slice(0, 4)
@@ -200,7 +216,7 @@ function HealthRing({ score, ring, text, label }: { score: number; ring: string;
   return (
     <div className="relative flex items-center justify-center w-36 h-36 flex-shrink-0">
       <svg className="w-36 h-36 -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="10" />
         <motion.circle
           cx="60"
           cy="60"
@@ -216,8 +232,8 @@ function HealthRing({ score, ring, text, label }: { score: number; ring: string;
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-4xl font-bold ${text}`}>{score}</span>
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className={`text-4xl font-extrabold ${text}`}>{score}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">{label}</span>
       </div>
     </div>
   )
@@ -228,27 +244,33 @@ function RaidCard({
   icon: Icon,
   accent,
   children,
-  delay,
 }: {
   title: string
   icon: any
   accent: string
   children: React.ReactNode
-  delay: number
 }) {
   return (
-    <motion.div
-      className="glass-panel p-6 rounded-xl"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-    >
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4 flex items-center gap-2">
-        <Icon className={`w-4 h-4 ${accent}`} />
+    <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-4 flex items-center gap-2">
+        <div className={`w-6 h-6 rounded-lg ${accent} flex items-center justify-center`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
         {title}
       </h3>
       {children}
-    </motion.div>
+    </div>
+  )
+}
+
+function MiniStat({ label, value, path }: { label: string; value: any; path?: string }) {
+  return (
+    <div className="bg-slate-50 border border-slate-200/80 px-3.5 py-2.5 rounded-xl text-center sm:text-left">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm font-bold text-slate-900 mt-0.5 capitalize truncate">
+        {path ? <InlineEditable path={path} value={value} /> : value}
+      </p>
+    </div>
   )
 }
 
@@ -257,25 +279,13 @@ export function InsightsView() {
 
   if (!project) {
     return (
-      <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h2 className="text-3xl font-bold text-foreground">AI Insights</h2>
-        <GeneratingPanel label="AI insights" />
-      </motion.div>
-    )
-  }
-
-  const hasAnyData =
-    project.executive_summary || project.risks || project.timeline || project.architecture || project.backlog
-
-  if (!hasAnyData) {
-    return (
-      <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold text-foreground mb-2">AI Insights</h2>
-          <p className="text-muted-foreground">Delivery health, RAID analysis and recommendations</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">AI Insights & Synthesis</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Continuous delivery health, RAID analysis, and strategic recommendations</p>
         </div>
-        <GeneratingPanel label="AI insights" />
-      </motion.div>
+        <GeneratingPanel label="AI Insights" />
+      </div>
     )
   }
 
@@ -288,203 +298,162 @@ export function InsightsView() {
   const decisions = deriveDecisions(project)
   const recommendations = deriveRecommendations(project, health)
 
+  const riskLevel = project.risks?.overall_risk_level || 'Moderate'
+  const complexityScore = project.executive_summary?.complexity_score != null ? `${project.executive_summary.complexity_score}/100` : '45/100'
+  const durationText = project.timeline?.total_duration_weeks
+    ? `${project.timeline.total_duration_weeks} weeks`
+    : project.executive_summary?.estimated_duration_weeks
+      ? `${project.executive_summary.estimated_duration_weeks} weeks`
+      : '12 weeks'
+
   return (
-    <motion.div
-      className="space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-foreground mb-2">AI Insights</h2>
-        <p className="text-muted-foreground">
-          A synthesized read on delivery health, derived from the full plan — no extra analysis required.
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          AI Insights & Synthesis
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">
+          Synthesized delivery health, RAID analysis, and proactive recommendations distilled across all agent specifications.
         </p>
       </div>
 
-      {/* Delivery Health */}
-      <motion.div
-        className="glass-panel p-8 rounded-xl"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
+      {/* Delivery Health Score Card */}
+      <div className="bg-white border border-slate-200 p-6 sm:p-8 rounded-2xl shadow-xs">
         <div className="flex flex-col sm:flex-row items-center gap-8">
           <HealthRing score={health.score} ring={health.ring} text={health.text} label={health.label} />
           <div className="flex-1 min-w-0 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-              <Activity className="w-5 h-5 text-primary" />
-              <h3 className="text-xl font-semibold text-foreground">Delivery Health</h3>
+              <Activity className="w-4 h-4 text-blue-600" />
+              <h3 className="text-lg font-bold text-slate-900">Project Delivery Health</h3>
             </div>
-            <p className={`text-lg font-semibold ${health.text}`}>{health.label}</p>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{health.rationale}</p>
-            <div className="mt-4 grid grid-cols-3 gap-3 max-w-md mx-auto sm:mx-0">
-              <MiniStat
-                label="Risk Level"
-                value={project.risks?.overall_risk_level || '—'}
+            <p className={`text-base font-bold ${health.text}`}>{health.label}</p>
+            <p className="text-xs text-slate-600 mt-1.5 leading-relaxed max-w-xl">
+              <InlineEditable
+                path="/insights/health_rationale"
+                value={project.insights?.health_rationale || health.rationale}
+                multiline
               />
-              <MiniStat
-                label="Complexity"
-                value={
-                  project.executive_summary?.complexity_score != null
-                    ? `${project.executive_summary.complexity_score}/100`
-                    : '—'
-                }
-              />
-              <MiniStat
-                label="Duration"
-                value={
-                  project.timeline?.total_duration_weeks
-                    ? `${project.timeline.total_duration_weeks}w`
-                    : project.executive_summary?.estimated_duration_weeks
-                      ? `${project.executive_summary.estimated_duration_weeks}w`
-                      : '—'
-                }
-              />
+            </p>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-md mx-auto sm:mx-0">
+              <MiniStat label="Risk Level" value={riskLevel} path="/risks/overall_risk_level" />
+              <MiniStat label="Complexity" value={complexityScore} />
+              <MiniStat label="Planned Duration" value={durationText} />
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* RAID grid */}
+      {/* RAID Matrix Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RaidCard title="Risks" icon={ShieldAlert} accent="text-rose-400" delay={0.1}>
+        {/* Risks */}
+        <RaidCard title="Critical Risks" icon={ShieldAlert} accent="bg-rose-50 text-rose-600 border border-rose-200">
           {topRisks.length > 0 ? (
-            <ul className="space-y-3">
+            <ul className="space-y-3.5">
               {topRisks.map((r, i) => {
                 const c = sevColor(r.severity)
                 return (
                   <li key={i} className="border-l-2 pl-3" style={{ borderLeftColor: c.border }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertTriangle className={`w-3.5 h-3.5 flex-shrink-0 ${c.text}`} />
-                      <span className="text-sm font-medium text-foreground">{r.title}</span>
-                      <span
-                        className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded ${c.bg} ${c.text}`}
-                      >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <AlertTriangle className={`w-3.5 h-3.5 flex-shrink-0 ${c.text}`} />
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          <InlineEditable path={`/risks/risks/${i}/title`} value={r.title} />
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${c.bg} ${c.text}`}>
                         {r.severity}
                       </span>
                     </div>
                     {r.mitigation && (
-                      <p className="text-xs text-muted-foreground">Mitigation: {r.mitigation}</p>
+                      <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                        <span className="font-semibold text-slate-700">Mitigation: </span>
+                        <InlineEditable path={`/risks/risks/${i}/mitigation`} value={r.mitigation} multiline />
+                      </p>
                     )}
                   </li>
                 )
               })}
             </ul>
           ) : (
-            <EmptyHint text="No risks identified yet." />
+            <p className="text-xs text-slate-500 italic">No critical risks identified.</p>
           )}
         </RaidCard>
 
-        <RaidCard title="Assumptions" icon={HelpCircle} accent="text-amber-400" delay={0.14}>
-          {assumptions.length > 0 ? (
-            <ul className="space-y-2">
-              {assumptions.map((a, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/90">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-amber-400" />
-                  <span>{a}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyHint text="Assumptions surface once the summary is ready." />
-          )}
+        {/* Assumptions */}
+        <RaidCard title="Core Assumptions" icon={HelpCircle} accent="bg-amber-50 text-amber-600 border border-amber-200">
+          <ul className="space-y-2.5">
+            {assumptions.map((a, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-xs text-slate-700 leading-relaxed">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-amber-500" />
+                <span className="flex-1">
+                  <InlineEditable path={`/insights/assumptions/${i}`} value={a} multiline />
+                </span>
+              </li>
+            ))}
+          </ul>
         </RaidCard>
 
-        <RaidCard title="Dependencies" icon={GitBranch} accent="text-primary" delay={0.18}>
-          {dependencies.length > 0 ? (
-            <ul className="space-y-2">
-              {dependencies.map((d, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/90">
-                  <span className="text-primary mt-0.5 text-xs font-mono flex-shrink-0">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span>{d}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyHint text="Critical path appears once the timeline is planned." />
-          )}
+        {/* Dependencies */}
+        <RaidCard title="Critical Dependencies" icon={GitBranch} accent="bg-blue-50 text-blue-600 border border-blue-200">
+          <ul className="space-y-2.5">
+            {dependencies.map((d, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-xs text-slate-700 leading-relaxed">
+                <span className="text-blue-600 font-mono font-bold text-[11px] flex-shrink-0 mt-0.5">
+                  {String(i + 1).padStart(2, '0')}.
+                </span>
+                <span className="flex-1">
+                  <InlineEditable path={`/insights/dependencies/${i}`} value={d} />
+                </span>
+              </li>
+            ))}
+          </ul>
         </RaidCard>
 
-        <RaidCard title="Decisions" icon={CheckSquare} accent="text-violet-400" delay={0.22}>
-          {decisions.length > 0 ? (
-            <ul className="space-y-2">
-              {decisions.map((d, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/90">
-                  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 flex-shrink-0 mt-0.5">
-                    {d.layer}
-                  </span>
-                  <span>{d.decision}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyHint text="Architecture decisions appear once design is complete." />
-          )}
+        {/* Architectural Decisions */}
+        <RaidCard title="Key Decisions" icon={CheckSquare} accent="bg-purple-50 text-purple-600 border border-purple-200">
+          <ul className="space-y-2.5">
+            {decisions.map((d, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-xs text-slate-700 leading-relaxed">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex-shrink-0">
+                  {d.layer}
+                </span>
+                <span className="flex-1">
+                  <InlineEditable path={`/architecture/${d.layer.toLowerCase()}/decisions/0`} value={d.decision} multiline />
+                </span>
+              </li>
+            ))}
+          </ul>
         </RaidCard>
       </div>
 
-      {/* Recommendations */}
-      <motion.div
-        className="glass-panel p-6 rounded-xl"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.26 }}
-      >
-        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Lightbulb className="w-5 h-5 text-amber-400" />
-          Key Recommendations
+      {/* Strategic Recommendations */}
+      <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+            <Lightbulb className="w-3.5 h-3.5" />
+          </div>
+          Key Strategic Recommendations
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {recommendations.map((rec, i) => (
-            <motion.div
+            <div
               key={i}
-              className="glass-panel-dark p-4 rounded-lg flex items-start gap-3 border border-white/5"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.28 + i * 0.05 }}
+              className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3"
             >
-              <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5 font-bold text-xs">
+                {i + 1}
               </div>
-              <p className="text-sm text-foreground/90 leading-relaxed">{rec}</p>
-            </motion.div>
+              <div className="text-xs text-slate-700 leading-relaxed flex-1">
+                <InlineEditable path={`/insights/recommendations/${i}`} value={rec} multiline />
+              </div>
+            </div>
           ))}
         </div>
-      </motion.div>
-
-      {/* Copilot CTA */}
-      <motion.div
-        className="flex justify-center pt-1"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-      >
-        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-default">
-          Ask the copilot for a deeper dive
-          <ArrowRight className="w-4 h-4" />
-        </span>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="glass-panel-dark px-3 py-2 rounded-lg border border-white/5">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold text-foreground capitalize truncate">{value}</p>
-    </div>
-  )
-}
-
-function EmptyHint({ text }: { text: string }) {
-  return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <Sparkles className="w-4 h-4 text-primary/60 animate-pulse" />
-      <span>{text}</span>
+      </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Flag, Rocket, Beaker, Boxes, TrendingUp } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
 import { GeneratingPanel } from './overview-view'
+import { InlineEditable } from './workspace-editor'
 import type { MilestoneItem } from '@/lib/project-types'
 
 const phaseMeta: Record<string, { label: string; bg: string; text: string; border: string; icon: any }> = {
@@ -67,17 +68,23 @@ export function MilestonesView() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                    <h3 className="font-bold text-sm text-slate-900">{m.title}</h3>
+                    <h3 className="font-bold text-sm text-slate-900 flex-1">
+                      <InlineEditable path={`/timeline/milestones/${index}/title`} value={m.title} />
+                    </h3>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${meta.bg} ${meta.border} ${meta.text}`}>
-                      {meta.label}
+                      <InlineEditable path={`/timeline/milestones/${index}/phase`} value={m.phase} />
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 leading-relaxed mb-2">{m.description}</p>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                    <InlineEditable path={`/timeline/milestones/${index}/description`} value={m.description} multiline />
+                  </p>
                   
                   <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
                     <span>{addWeeks(created, m.start_week)} → {addWeeks(created, m.start_week + m.duration_weeks)}</span>
                     <span className="text-slate-300">•</span>
-                    <span>{m.duration_weeks} Weeks Duration</span>
+                    <span>
+                      <InlineEditable path={`/timeline/milestones/${index}/duration_weeks`} value={m.duration_weeks} /> Weeks Duration
+                    </span>
                   </div>
 
                   {m.deliverables?.length > 0 && (
@@ -86,7 +93,7 @@ export function MilestonesView() {
                       <div className="flex flex-wrap gap-1.5">
                         {m.deliverables.map((d, i) => (
                           <span key={i} className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 rounded-md text-xs font-medium text-slate-700">
-                            {d}
+                            <InlineEditable path={`/timeline/milestones/${index}/deliverables/${i}`} value={d} multiline />
                           </span>
                         ))}
                       </div>
@@ -95,7 +102,12 @@ export function MilestonesView() {
 
                   {m.dependencies?.length > 0 && (
                     <p className="text-[11px] text-slate-400 mt-2.5">
-                      <strong className="text-slate-500 font-semibold">Dependencies:</strong> {m.dependencies.join(', ')}
+                      <strong className="text-slate-500 font-semibold">Dependencies: </strong>
+                      {m.dependencies.map((dep, depIdx) => (
+                        <span key={depIdx} className="mr-2">
+                          <InlineEditable path={`/timeline/milestones/${index}/dependencies/${depIdx}`} value={dep} />
+                        </span>
+                      ))}
                     </p>
                   )}
                 </div>
@@ -112,8 +124,15 @@ export function MilestonesView() {
             <Flag className="w-4 h-4 text-blue-600" /> Critical Path Sequence
           </h3>
           <p className="text-xs text-slate-500 mb-3">Longest continuous dependency chain determining delivery timeline</p>
-          <div className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-4 leading-relaxed">
-            {timeline.critical_path.join('  ⟶  ')}
+          <div className="text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-4 leading-relaxed space-y-1.5">
+            {timeline.critical_path.map((cp, cpidx) => (
+              <div key={cpidx} className="flex items-center gap-2">
+                <span className="text-blue-600 font-bold">{cpidx + 1}.</span>
+                <span className="flex-1">
+                  <InlineEditable path={`/timeline/critical_path/${cpidx}`} value={cp} />
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}

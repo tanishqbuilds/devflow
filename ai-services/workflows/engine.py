@@ -124,17 +124,17 @@ class WorkflowEngine:
                 )
                 if attempt < max_attempts:
                     is_rate_limit = "429" in err_msg or "413" in err_msg or "rate limit" in err_msg.lower() or "tokens per minute" in err_msg.lower()
-                    backoff = 6.0 * attempt if is_rate_limit else 2.0 * attempt
+                    backoff = 20.0 * attempt if is_rate_limit else 2.0 * attempt
                     await self._emitter.log(
                         agent_id,
-                        f"{agent.name}: transient issue, pausing {backoff:.1f}s before retry ({attempt}/{max_attempts})...",
+                        f"{agent.name}: transient provider rate limit, pausing {backoff:.0f}s before retry ({attempt}/{max_attempts})...",
                         level="warning",
                     )
                     await asyncio.sleep(backoff)
                 else:
                     logger.exception("Agent %s permanently failed after %d attempts", agent_id, max_attempts)
                     await self._emitter.error(node, agent_id, str(exc)[:300])
-                    await self._emitter.node_update(node, "complete", 100, agent.name)
+                    await self._emitter.node_update(node, "failed", 100, agent.name)
                     await self._emitter.log(agent_id, f"{agent.name}: failed — {str(exc)[:160]}", level="error")
                     return False
             finally:
@@ -193,7 +193,7 @@ class WorkflowEngine:
 
         # 2. Run all stages with checkpoint resumability
         for stage in STAGES:
-            for aid in stage:
+            async def run_stage_agent(aid: str) -> None:
                 sec = SECTION_OF[aid]
                 node = get_agent(aid).node
                 is_already_done = bool(self._ctx.get(sec))
@@ -209,7 +209,22 @@ class WorkflowEngine:
                     await self._emitter.progress(int(self._completed_units / TOTAL_UNITS * 90))
                 else:
                     await self._run_agent(aid)
-                    await asyncio.sleep(0.6)  # Gentle pacing for Groq free-tier TPM rate limits
+            async def staggered_run(aid: str, delay_idx: int) -> None:
+                if delay_idx > 0:
+                    await asyncio.sleep(delay_idx * 1.5)
+                await run_stage_agent(aid)
+
+            # Fan-out/fan-in: peers in a stage communicate through the shared
+            # upstream context and complete before dependent stages start.
+            await asyncio.gather(*(staggered_run(aid, idx) for idx, aid in enumerate(stage)))
+            await asyncio.sleep(0.6)  # Gentle pacing for provider rate limits
+
+        missing=[section for section in SECTION_OF.values() if not self._ctx.get(section)]
+        if missing:
+            await self._emitter.log("system",f"Run incomplete; missing required sections: {', '.join(missing)}",level="error")
+            await self._emitter.run_failed(missing)
+            logger.error("Workflow incomplete for %s: %s",self._project_id,missing)
+            return self._ctx
 
         # 3. Run CEO Supervisor outer loop for quality assurance & selective refinement
         self._ctx = await self._supervisor.evaluate_and_supervise(self._ctx)

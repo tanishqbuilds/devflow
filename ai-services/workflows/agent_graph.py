@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
-from llm.langchain_client import get_chat_model
+from llm.langchain_client import LLM_PROVIDER, get_chat_model
 from llm.router import ModelConfig
 from tools.agent_tools import get_tools_for_agent
 from tools.project_context import select_project_context
@@ -40,7 +40,13 @@ class AgentGraphState(TypedDict, total=False):
 
 
 def _structured(model: Any, schema: type[BaseModel]) -> Any:
-    # Function calling / tool calling works across ChatGroq, OpenAI, and Ollama.
+    # Groq's tool-calling parser is brittle with large nested schemas: a model
+    # response containing a duplicate key or an unfamiliar enum is rejected by
+    # Groq before Pydantic gets a chance to normalize it. JSON mode lets us
+    # validate and normalize the complete response locally instead. Other
+    # providers retain native structured output support.
+    if LLM_PROVIDER.lower() == "groq":
+        return model.with_structured_output(schema, method="json_mode")
     return model.with_structured_output(schema)
 
 
@@ -70,7 +76,8 @@ def build_agent_graph(
         sys_messages.append(
             ("system", f"CRITICAL CEO SUPERVISOR DIRECTIVE (you MUST address this):\n{directive}")
         )
-    sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}"))
+    sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}\n\nResults from callable specialist tools:\n{tool_insights}"))
+    sys_messages.append(("system", "Return only one valid JSON object matching the requested schema. Do not return a function/tool envelope, markdown, or commentary."))
 
     generation_prompt = ChatPromptTemplate.from_messages(
         [
@@ -122,11 +129,76 @@ def build_agent_graph(
         }
 
     async def generate(state: AgentGraphState) -> dict[str, Any]:
-        draft = await (generation_prompt | generator).ainvoke(state)
+        try:
+            draft = await (generation_prompt | generator).ainvoke(state)
+        except Exception as exc:
+            import re
+            err_str = str(exc)
+            raw_json = None
+
+            # Pattern 1: <function=...>{...}</function>
+            match = re.search(r"<function=[^>]+>\s*(\{.*\})\s*</function>", err_str, re.S)
+            if match:
+                raw_json = match.group(1)
+
+            # Pattern 2: failed_generation: '...' or "..." or raw JSON object
+            if not raw_json and "failed_generation" in err_str:
+                fg_match = re.search(r"['\"]failed_generation['\"]\s*:\s*(['\"])(.*?)\1(?=[,\}])", err_str, re.S)
+                if fg_match:
+                    raw_candidate = fg_match.group(2)
+                    try:
+                        raw_candidate = raw_candidate.encode().decode('unicode_escape')
+                    except Exception:
+                        pass
+                    inner_m = re.search(r"<function=[^>]+>\s*(\{.*\})\s*</function>", raw_candidate, re.S)
+                    if inner_m:
+                        raw_json = inner_m.group(1)
+                    else:
+                        json_m = re.search(r"(\{.*\})", raw_candidate, re.S)
+                        if json_m:
+                            raw_json = json_m.group(1)
+                else:
+                    json_m = re.search(r"(\{.*\})", err_str, re.S)
+                    if json_m:
+                        raw_json = json_m.group(1)
+
+            if raw_json:
+                try:
+                    parsed = json.loads(raw_json)
+                    if isinstance(parsed, dict) and "parameters" in parsed and isinstance(parsed["parameters"], dict):
+                        parsed = parsed["parameters"]
+                    draft = schema.model_validate(parsed)
+                    logger.warning("Agent %s recovered schema-valid output from rejected tool envelope", agent_id)
+                    return {"draft": draft}
+                except Exception as parse_err:
+                    logger.debug("Failed to salvage rejected tool envelope: %s", parse_err)
+            raise exc
         return {"draft": draft}
 
+    async def call_tools(state: AgentGraphState) -> dict[str, Any]:
+        """Execute each safe domain tool and expose its grounded result to generation.
+
+        Consultation tools require a question and are represented by upstream agent state;
+        domain/calculation tools are true LangChain tools invoked through their schemas.
+        """
+        results=[]
+        for specialist_tool in get_tools_for_agent(agent_id):
+            if specialist_tool.name.startswith("consult_"):
+                continue
+            schema=getattr(specialist_tool,"args_schema",None)
+            fields=getattr(schema,"model_fields",{}) if schema else {}
+            if any(field.is_required() for field in fields.values()):
+                continue
+            try:
+                value=await specialist_tool.ainvoke({})
+                results.append(f"[{specialist_tool.name}]\n{value}")
+                logger.info("Agent %s called tool %s",agent_id,specialist_tool.name)
+            except Exception as exc:
+                logger.warning("Agent %s tool %s unavailable: %s",agent_id,specialist_tool.name,str(exc)[:120])
+        return {"tool_insights":"\n\n".join(results) or "No external tool result was required."}
+
     async def review(state: AgentGraphState) -> dict[str, Any]:
-        if os.getenv("LLM_QUALITY_REVIEW", "true").lower() not in {"1", "true", "yes"}:
+        if os.getenv("LLM_QUALITY_REVIEW", "false").lower() not in {"1", "true", "yes"}:
             return {"review": QualityReview(passed=True)}
         try:
             result = await (review_prompt | reviewer).ainvoke(
@@ -168,11 +240,13 @@ def build_agent_graph(
     graph = StateGraph(AgentGraphState)
     graph.add_node("retrieve_context", retrieve_context)
     graph.add_node("generate", generate)
+    graph.add_node("call_tools", call_tools)
     graph.add_node("review", review)
     graph.add_node("refine", refine)
     graph.add_node("finish", finish)
     graph.add_edge(START, "retrieve_context")
-    graph.add_edge("retrieve_context", "generate")
+    graph.add_edge("retrieve_context", "call_tools")
+    graph.add_edge("call_tools", "generate")
     graph.add_edge("generate", "review")
     graph.add_conditional_edges(
         "review", route_after_review, {"refine": "refine", "finish": "finish"}

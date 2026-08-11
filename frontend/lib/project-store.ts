@@ -19,6 +19,7 @@ const NODE_LABELS: Record<string, string> = {
 }
 
 const SECTION_KEYS = [
+  'manager_inputs',
   'executive_summary',
   'requirements',
   'architecture',
@@ -123,6 +124,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }
       case 'run_complete': {
         set({ status: 'complete', progress: 100, lastSeq: evt.seq })
+        break
+      }
+      case 'run_failed': {
+        set({status:'failed',error:`${evt.message}: ${evt.missing_sections.join(', ')}`,lastSeq:evt.seq})
         break
       }
       case 'error': {

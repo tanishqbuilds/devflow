@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useProjectStore } from '@/lib/project-store'
+import { InlineEditable } from './workspace-editor'
 import {
   Target, Clock, Users, Sparkles, CheckCircle2,
   DollarSign, ShieldAlert, Flag, TrendingUp, Loader2,
@@ -52,10 +53,10 @@ export function OverviewView() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{title}</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight"><InlineEditable path="/executive_summary/project_title" value={title} /></h1>
               <StatusPill status={status} />
             </div>
-            <p className="text-slate-500 text-base max-w-2xl">{subtitle}</p>
+            <p className="text-slate-500 text-base max-w-2xl"><InlineEditable path={exec?.tagline ? '/executive_summary/tagline' : '/idea'} value={subtitle} multiline /></p>
           </div>
           {exec && (
             <div className="text-right shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
@@ -70,7 +71,7 @@ export function OverviewView() {
         {exec?.vision && (
           <div className="mt-5 text-sm text-slate-700 max-w-3xl leading-relaxed bg-slate-50 border border-slate-200/80 rounded-xl p-4">
             <span className="font-semibold text-slate-900 block mb-1 text-xs uppercase tracking-wider">Executive Vision</span>
-            {exec.vision}
+            <InlineEditable path="/executive_summary/vision" value={exec.vision} multiline />
           </div>
         )}
       </div>
@@ -99,11 +100,34 @@ export function OverviewView() {
 
       {/* 4 Detail Panels */}
       {exec ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Panel title="Business Goals" icon={Target} items={exec.business_goals} />
-          <Panel title="Success Criteria" icon={CheckCircle2} items={exec.success_criteria} />
-          <Panel title="Target Users & Personas" icon={Users} items={exec.target_users} />
-          <Panel title="Key Differentiators" icon={Sparkles} items={exec.key_differentiators} />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Panel title="Business Goals" icon={Target} items={exec.business_goals} pathPrefix="/executive_summary/business_goals" />
+            <Panel title="Success Criteria" icon={CheckCircle2} items={exec.success_criteria} pathPrefix="/executive_summary/success_criteria" />
+            <Panel title="Target Users & Personas" icon={Users} items={exec.target_users} pathPrefix="/executive_summary/target_users" />
+            <Panel title="Key Differentiators" icon={Sparkles} items={exec.key_differentiators} pathPrefix="/executive_summary/key_differentiators" />
+          </div>
+
+          {(exec.competitive_landscape || exec.go_to_market) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {exec.competitive_landscape && (
+                <div className="bg-white border border-slate-200 p-5 sm:p-6 rounded-xl shadow-xs">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Competitive Landscape</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    <InlineEditable path="/executive_summary/competitive_landscape" value={exec.competitive_landscape} multiline />
+                  </p>
+                </div>
+              )}
+              {exec.go_to_market && (
+                <div className="bg-white border border-slate-200 p-5 sm:p-6 rounded-xl shadow-xs">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Go-To-Market Strategy</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    <InlineEditable path="/executive_summary/go_to_market" value={exec.go_to_market} multiline />
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <GeneratingPanel label="Executive Summary" />
@@ -127,7 +151,7 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
-function Panel({ title, icon: Icon, items }: { title: string; icon: any; items: string[] }) {
+function Panel({ title, icon: Icon, items, pathPrefix }: { title: string; icon: any; items: string[]; pathPrefix?: string }) {
   return (
     <div className="bg-white border border-slate-200 p-5 sm:p-6 rounded-xl shadow-xs">
       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -138,7 +162,13 @@ function Panel({ title, icon: Icon, items }: { title: string; icon: any; items: 
         {(items || []).map((item, idx) => (
           <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 leading-relaxed">
             <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-600 flex-shrink-0" />
-            <span>{item}</span>
+            <span className="flex-1">
+              {pathPrefix ? (
+                <InlineEditable path={`${pathPrefix}/${idx}`} value={item} multiline />
+              ) : (
+                item
+              )}
+            </span>
           </li>
         ))}
       </ul>

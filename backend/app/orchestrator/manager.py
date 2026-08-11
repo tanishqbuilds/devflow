@@ -47,16 +47,21 @@ async def _consume_run(project_id: str) -> None:
     await pubsub.subscribe(channel)
 
     # Trigger the AI workflow only after we're subscribed, so no early events are lost.
-    try:
-        await ai_services.run_workflow(project_id, *await _project_inputs(project_id))
-    except Exception as exc:
-        logger.error("Failed to start workflow for %s: %s", project_id, exc)
-        await project_service.set_status(project_id, "failed", error=f"AI services unreachable: {exc}")
-        await pubsub.unsubscribe(channel)
-        await pubsub.aclose()
-        return
-
     deadline = asyncio.get_event_loop().time() + settings.run_timeout_seconds
+    attempt = 0
+    while not _shutdown.is_set():
+        try:
+            await ai_services.run_workflow(project_id, *await _project_inputs(project_id))
+            break
+        except Exception as exc:
+            attempt += 1
+            delay = min(30.0, 2 ** min(attempt, 5))
+            logger.warning("AI service unavailable for %s (attempt %d); retrying in %.0fs: %s", project_id, attempt, delay, exc)
+            await project_service.set_status(project_id, "queued", error=f"AI service unavailable; reconnecting (attempt {attempt})")
+            if asyncio.get_event_loop().time() + delay >= deadline:
+                await project_service.set_status(project_id, "failed", error="AI service recovery deadline exceeded")
+                await pubsub.unsubscribe(channel); await pubsub.aclose(); return
+            await asyncio.sleep(delay)
     try:
         while not _shutdown.is_set():
             remaining = deadline - asyncio.get_event_loop().time()
@@ -84,6 +89,11 @@ async def _consume_run(project_id: str) -> None:
                 await project_service.set_status(project_id, "complete", progress=100)
                 logger.info("Run %s complete", project_id)
                 break
+            if event.get("type") == "run_failed":
+                missing=", ".join(event.get("missing_sections") or [])
+                await project_service.set_status(project_id,"failed",error=f"Incomplete AI output: {missing}")
+                logger.error("Run %s incomplete: %s",project_id,missing)
+                break
     finally:
         await pubsub.unsubscribe(channel)
         await pubsub.aclose()
@@ -93,7 +103,11 @@ async def _project_inputs(project_id: str) -> tuple[str, str | None]:
     doc = await project_service.get_project(project_id)
     if not doc:
         raise RuntimeError(f"project {project_id} not found")
-    return doc["idea"], doc.get("title")
+    inputs=doc.get("manager_inputs") or {}
+    enriched=doc["idea"]
+    if inputs:
+        enriched += "\n\nMANAGER-PROVIDED DELIVERY CONSTRAINTS (authoritative):\n" + json.dumps(inputs)
+    return enriched, doc.get("title")
 
 
 async def _worker(worker_id: int) -> None:
