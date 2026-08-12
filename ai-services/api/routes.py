@@ -7,14 +7,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agents.registry import AGENTS, get_agent
 from services.assistant import chat as assistant_chat
-from services.redis_client import get_redis
 from utils.logging import get_logger
 from workflows.engine import WorkflowEngine
 
@@ -88,11 +89,82 @@ async def _run_workflow(
     title: str | None,
     target_agents: list[str] | None = None,
 ) -> None:
-    engine = WorkflowEngine(get_redis(), project_id)
+    engine = WorkflowEngine(project_id)
     try:
         await engine.run(idea, title, only_missing=True, target_agents=target_agents)
     except Exception:
         logger.exception("Workflow crashed for project %s", project_id)
+
+
+@router.post("/workflow/stream")
+async def stream_workflow(req: WorkflowRunRequest) -> StreamingResponse:
+    """Stream workflow progress events in real-time as newline-delimited JSON."""
+    async def event_generator():
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        engine = WorkflowEngine(req.project_id, listener=queue)
+
+        async def run_task():
+            try:
+                await engine.run(req.idea, req.title, only_missing=True)
+            except Exception as exc:
+                logger.exception("Workflow failed for %s", req.project_id)
+                await queue.put({
+                    "type": "error",
+                    "node": "workflow",
+                    "agent": "engine",
+                    "message": str(exc),
+                })
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run_task())
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield json.dumps(event, default=str) + "\n"
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+
+@router.post("/workflow/stream-retry")
+async def stream_retry_workflow(req: WorkflowRetryRequest) -> StreamingResponse:
+    """Stream retry workflow events in real-time as newline-delimited JSON."""
+    async def event_generator():
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        engine = WorkflowEngine(req.project_id, listener=queue)
+        idea = req.idea or ""
+
+        async def run_task():
+            try:
+                await engine.run(idea, req.title, only_missing=True, target_agents=req.target_agents)
+            except Exception as exc:
+                logger.exception("Workflow retry failed for %s", req.project_id)
+                await queue.put({
+                    "type": "error",
+                    "node": "workflow",
+                    "agent": "engine",
+                    "message": str(exc),
+                })
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run_task())
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield json.dumps(event, default=str) + "\n"
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @router.post("/workflow/run")

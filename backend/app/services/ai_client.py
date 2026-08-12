@@ -1,12 +1,5 @@
-"""HTTP client for the ai-services orchestration layer.
-
-The backend is the only component that talks to ai-services; the frontend never
-does. Workflow runs are fire-and-forget (ai-services streams progress over the
-shared Redis channel), so the call itself returns quickly.
-"""
-from __future__ import annotations
-
-from typing import Any, Optional
+import json
+from typing import Any, AsyncGenerator, Optional
 
 import httpx
 
@@ -19,6 +12,61 @@ logger = get_logger("services.ai_client")
 class AIServicesClient:
     def __init__(self, base_url: Optional[str] = None):
         self._base_url = (base_url or settings.ai_services_url).rstrip("/")
+
+    async def stream_workflow(
+        self, project_id: str, idea: str, title: Optional[str]
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream orchestration events in real time from ai-services over HTTP."""
+        url = f"{self._base_url}/workflow/stream"
+        payload = {"project_id": project_id, "idea": idea, "title": title}
+        timeout = httpx.Timeout(settings.run_timeout_seconds, connect=15.0)
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", url, json=payload) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    try:
+                        event = json.loads(line)
+                        yield event
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+    async def stream_retry(
+        self,
+        project_id: str,
+        idea: str,
+        title: Optional[str] = None,
+        target_agents: Optional[list[str]] = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream retry events in real time from ai-services over HTTP."""
+        url = f"{self._base_url}/workflow/stream-retry"
+        payload = {
+            "project_id": project_id,
+            "idea": idea,
+            "title": title,
+            "target_agents": target_agents,
+        }
+        timeout = httpx.Timeout(settings.run_timeout_seconds, connect=15.0)
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", url, json=payload) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    try:
+                        event = json.loads(line)
+                        yield event
+                    except (json.JSONDecodeError, TypeError):
+                        continue
 
     async def run_workflow(self, project_id: str, idea: str, title: Optional[str]) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=30.0) as client:

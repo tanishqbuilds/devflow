@@ -1,15 +1,17 @@
 """Project memory and durable context store for Devflow agents."""
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from memory.agent_store import AgentStore
 from services.db_client import fetch_project_chat_history, fetch_project_document, save_project_iteration
-from services.redis_client import get_redis
 from utils.logging import get_logger
 
 logger = get_logger("memory.project")
+
+# Global in-memory cache for decisions & iterations during runs
+_PROJECT_DECISIONS: dict[str, list[dict[str, Any]]] = {}
+_PROJECT_DOC_CACHE: dict[str, dict[str, Any]] = {}
 
 
 class ProjectMemory:
@@ -18,16 +20,15 @@ class ProjectMemory:
     def __init__(self, project_id: str, user_id: str | None = None):
         self.project_id = project_id
         self.user_id = user_id or "system"
-        self._memory_key = f"project_memory:{project_id}"
-        self._iteration_key = f"project_iterations:{project_id}"
         self.agent_store = AgentStore(project_id, self.user_id)
 
     async def get_previous_project_context(self) -> dict[str, Any]:
         """Retrieve the authoritative prior database state of the project for iterations."""
-        # 1. Try PostgreSQL document
+        # 1. Try PostgreSQL / Supabase document
         db_proj = await fetch_project_document(self.project_id)
         if db_proj and db_proj.get("document"):
             doc = db_proj["document"]
+            _PROJECT_DOC_CACHE[self.project_id] = doc
             return {
                 "project_id": self.project_id,
                 "title": db_proj.get("title"),
@@ -43,15 +44,10 @@ class ProjectMemory:
                 "cost": doc.get("cost"),
             }
 
-        # 2. Fallback to Redis cache
-        redis = get_redis()
-        if redis:
-            try:
-                cached = await redis.get(f"project_doc:{self.project_id}")
-                if cached:
-                    return json.loads(cached)
-            except Exception as exc:
-                logger.debug("Redis memory lookup fallback: %s", exc)
+        # 2. Fallback to in-memory cache
+        if self.project_id in _PROJECT_DOC_CACHE:
+            doc = _PROJECT_DOC_CACHE[self.project_id]
+            return {"project_id": self.project_id, "previous_document": doc}
 
         return {"project_id": self.project_id}
 
@@ -74,41 +70,24 @@ class ProjectMemory:
 
     async def save_decision(self, agent_id: str, topic: str, decision: dict[str, Any]) -> None:
         """Store a durable architectural or product decision."""
-        redis = get_redis()
         entry = {
             "agent_id": agent_id,
             "topic": topic,
             "decision": decision,
         }
-        if redis:
-            try:
-                await redis.rpush(self._memory_key, json.dumps(entry, default=str))
-                await redis.expire(self._memory_key, 86400 * 7)  # 7 days retention
-            except Exception as exc:
-                logger.warning("Failed to save decision to Redis: %s", exc)
+        if self.project_id not in _PROJECT_DECISIONS:
+            _PROJECT_DECISIONS[self.project_id] = []
+        _PROJECT_DECISIONS[self.project_id].append(entry)
 
     async def save_iteration_diff(self, section: str, data: dict[str, Any]) -> None:
-        """Store a versioned iteration diff in both PostgreSQL and Redis."""
-        # Save to PostgreSQL
+        """Store a versioned iteration diff in PostgreSQL / Supabase and in-memory cache."""
+        # Save to PostgreSQL / Supabase
         await save_project_iteration(self.project_id, self.user_id, section, data)
 
-        # Cache snapshot in Redis
-        redis = get_redis()
-        if redis:
-            try:
-                await redis.hset(self._iteration_key, section, json.dumps(data, default=str))
-                await redis.expire(self._iteration_key, 86400 * 7)
-            except Exception as exc:
-                logger.warning("Failed to cache iteration snapshot in Redis: %s", exc)
+        if self.project_id not in _PROJECT_DOC_CACHE:
+            _PROJECT_DOC_CACHE[self.project_id] = {}
+        _PROJECT_DOC_CACHE[self.project_id][section] = data
 
     async def get_history(self) -> list[dict[str, Any]]:
         """Retrieve all recorded decisions for this project."""
-        redis = get_redis()
-        if not redis:
-            return []
-        try:
-            records = await redis.lrange(self._memory_key, 0, -1)
-            return [json.loads(r) for r in records if r]
-        except Exception as exc:
-            logger.warning("Failed to read memory from Redis: %s", exc)
-            return []
+        return list(_PROJECT_DECISIONS.get(self.project_id, []))

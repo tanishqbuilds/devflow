@@ -3,6 +3,19 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Search for .env in current dir, backend/, or workspace root
+_current_dir = Path(__file__).resolve().parent
+for candidate in (
+    _current_dir.parents[2] / ".env",
+    _current_dir.parents[1] / ".env",
+    Path(".env"),
+):
+    if candidate.is_file():
+        load_dotenv(candidate, override=False)
+        break
 
 
 def _csv(name: str, default: str) -> list[str]:
@@ -12,7 +25,6 @@ def _csv(name: str, default: str) -> list[str]:
 @dataclass(frozen=True)
 class Settings:
     app_version: str = "1.0.0"
-    redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     database_url: str = os.getenv(
         "DATABASE_URL", "postgresql://devflow:devflow@postgres:5432/devflow"
     )

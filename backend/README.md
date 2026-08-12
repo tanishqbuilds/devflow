@@ -1,16 +1,16 @@
 # Devflow Backend API ⚙️
 
-The backend coordinates authenticated REST/WebSocket APIs and persists Clerk users, projects, and AI responses in PostgreSQL. Redis carries orchestration jobs and live events.
+The backend coordinates authenticated REST and WebSocket APIs, persists Clerk users, projects, and AI responses in Supabase (PostgreSQL), and streams real-time AI generation events directly to connected clients.
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Framework**: FastAPI (Python 3.11-slim base image)
+- **Framework**: FastAPI (Python 3.11/3.12)
 - **ASGI Server**: Uvicorn
 - **Object Mapping / Schemas**: Pydantic v2
-- **Database Driver**: asyncpg (PostgreSQL)
-- **Cache Client**: `redis-py` (asyncio support)
+- **Database Driver**: asyncpg (PostgreSQL / Supabase with SSL)
+- **Event Dispatch**: In-Memory Event Bus & Async Job Queue
 
 ---
 
@@ -19,16 +19,15 @@ The backend coordinates authenticated REST/WebSocket APIs and persists Clerk use
 ```
 backend/
 ├── app/
-│   ├── api/            # API Routers defining routes (e.g., project, task endpoints)
-│   ├── core/           # Configuration management (settings, CORS setup)
-│   ├── db/             # PostgreSQL and Redis connection clients
-│   ├── middleware/     # Custom HTTP request/response middleware
-│   ├── models/         # Pydantic schemas and database entity models
-│   ├── orchestrator/   # Main business logic for workflow generation
-│   ├── utils/          # General helper functions (formatting, validation)
-│   └── main.py         # Entry point which initializes the FastAPI application
+│   ├── api/            # API Routers (projects, streaming, users, workspaces)
+│   ├── core/           # Configuration, authentication, and logging
+│   ├── db/             # PostgreSQL / Supabase connection pooling & schema
+│   ├── models/         # Pydantic schemas and database models
+│   ├── orchestrator/   # Workflow management and event streaming
+│   ├── services/       # In-memory event bus, projects, AI client
+│   └── main.py         # FastAPI application entrypoint
 │
-├── Dockerfile          # Multi-stage image build config
+├── Dockerfile          # Container build configuration
 └── requirements.txt    # Declared Python library dependencies
 ```
 
@@ -36,60 +35,53 @@ backend/
 
 ## 🚦 Health Check & Swagger UI
 
-FastAPI automatically generates interactive Swagger documentation, making it easy to test backend endpoints.
-
 - **Swagger UI**: Visit `http://localhost:8000/docs` in your browser.
 - **Health Endpoint**: Test service status with `GET /health`.
 
-#### Health Response format:
+#### Health Response:
 ```json
 {
   "status": "healthy",
   "version": "1.0.0",
-  "uptime_seconds": 320.15,
+  "uptime_seconds": 12.4,
   "dependencies": {
-    "redis": "healthy",
-    "postgres": "healthy"
+    "database": "healthy",
+    "ai_services": "healthy"
   }
 }
 ```
 
-If Redis or PostgreSQL fails to reply, health changes to `"degraded"` and reports the failing dependency.
-
 ---
 
-## 🚀 Local Development Setup
-
-To run the backend service locally (without Docker):
+## 🚀 Local Development Setup (Without Docker)
 
 ### 1. Environment Configuration
 
-Create a `.env` file in the `backend/` directory or set the variables in your environment:
-
+Ensure `backend/.env` or the root `.env` contains:
 ```env
-REDIS_URL=redis://localhost:6379/0
-DATABASE_URL=postgresql://devflow:devflow@localhost:5433/devflow
-CLERK_SECRET_KEY=sk_test_...
-CLERK_ISSUER_URL=https://your-instance.clerk.accounts.dev
+DATABASE_URL=postgresql://postgres:[PASSWORD]@[YOUR-HOST]:5432/postgres
+AI_SERVICES_URL=http://localhost:8001
+BYPASS_AUTH=true
 ```
 
 ### 2. Set Up Virtual Environment
 
 ```bash
 # Create virtual environment
-python -m venv venv
+python3 -m venv .venv
 
 # Activate virtual environment
-source venv/bin/activate # On Windows use: venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Run the API Server
+### 3. Run the Backend API Server
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# or from root: make local-backend
 ```
 
-The API will now be running at `http://localhost:8000`. You can inspect the Swagger docs at `/docs`.
+The API will be available at `http://localhost:8000`. Interactive docs are at `http://localhost:8000/docs`.

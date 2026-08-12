@@ -1,33 +1,29 @@
 """Orchestration event emission.
 
-The workflow engine publishes events to a Redis pub/sub channel
-(``events:{project_id}``) as it runs. The backend subscribes to this channel to
-(a) persist section outputs to PostgreSQL and (b) relay events to the browser over
-WebSockets. Events also carry a monotonically increasing ``seq`` for ordering.
+The workflow engine emits events sequentially with a monotonic ``seq``.
+Events can be dispatched to an in-memory queue or callback for HTTP streaming.
 """
 from __future__ import annotations
 
-import json
+import asyncio
 import time
-from typing import Any
-
-import redis.asyncio as aioredis
+from typing import Any, Awaitable, Callable
 
 from utils.logging import get_logger
 
 logger = get_logger("workflow.events")
 
-
-def channel_for(project_id: str) -> str:
-    return f"events:{project_id}"
+EventListener = Callable[[dict[str, Any]], Awaitable[None]] | asyncio.Queue
 
 
 class EventEmitter:
-    def __init__(self, redis: aioredis.Redis, project_id: str):
-        self._redis = redis
+    def __init__(self, project_id: str, listener: EventListener | None = None):
         self._project_id = project_id
-        self._channel = channel_for(project_id)
+        self._listener = listener
         self._seq = 0
+
+    def set_listener(self, listener: EventListener | None) -> None:
+        self._listener = listener
 
     async def _publish(self, event: dict[str, Any]) -> None:
         self._seq += 1
@@ -38,10 +34,16 @@ class EventEmitter:
                 "ts": round(time.time(), 3),
             }
         )
-        try:
-            await self._redis.publish(self._channel, json.dumps(event))
-        except Exception as exc:  # never let telemetry break the run
-            logger.error("Failed to publish event %s: %s", event.get("type"), exc)
+        if self._listener is not None:
+            try:
+                if isinstance(self._listener, asyncio.Queue):
+                    await self._listener.put(event)
+                elif callable(self._listener):
+                    res = self._listener(event)
+                    if asyncio.iscoroutine(res):
+                        await res
+            except Exception as exc:
+                logger.warning("Error dispatching event %s: %s", event.get("type"), exc)
 
     async def run_started(self, agents: list[dict[str, Any]]) -> None:
         await self._publish({"type": "run_started", "agents": agents})
@@ -65,8 +67,12 @@ class EventEmitter:
     async def run_complete(self) -> None:
         await self._publish({"type": "run_complete", "progress": 100})
 
-    async def run_failed(self, missing_sections:list[str]) -> None:
-        await self._publish({"type":"run_failed","missing_sections":missing_sections,"message":"Required sections remain incomplete"})
+    async def run_failed(self, missing_sections: list[str]) -> None:
+        await self._publish({
+            "type": "run_failed",
+            "missing_sections": missing_sections,
+            "message": "Required sections remain incomplete",
+        })
 
     async def error(self, node: str, agent: str, message: str) -> None:
         await self._publish({"type": "error", "node": node, "agent": agent, "message": message})

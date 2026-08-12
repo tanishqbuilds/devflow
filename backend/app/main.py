@@ -14,8 +14,8 @@ from app.api.workspaces import router as workspaces_router
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.postgres import close_postgres, init_postgres, pool
-from app.db.redis import close_redis, get_redis
 from app.orchestrator.manager import start_workers, stop_workers
+from app.services.ai_client import ai_services
 
 logger = get_logger("main")
 START_TIME = time.time()
@@ -29,7 +29,6 @@ async def lifespan(app: FastAPI):
     logger.info("Orchestrator workers started (%d)", settings.worker_count)
     yield
     await stop_workers()
-    await close_redis()
     await close_postgres()
     logger.info("Devflow backend shut down")
 
@@ -81,18 +80,19 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"redis": "unknown", "postgres": "unknown"}
-    try:
-        await get_redis().ping()
-        dependencies["redis"] = "healthy"
-    except Exception as e:
-        dependencies["redis"] = f"unhealthy: {str(e)}"
+    dependencies = {"database": "unknown", "ai_services": "unknown"}
     try:
         async with pool().acquire() as conn:
             await conn.fetchval("SELECT 1")
-        dependencies["postgres"] = "healthy"
+        dependencies["database"] = "healthy"
     except Exception as e:
-        dependencies["postgres"] = f"unhealthy: {str(e)}"
+        dependencies["database"] = f"unhealthy: {str(e)}"
+
+    try:
+        ai_health = await ai_services.health()
+        dependencies["ai_services"] = "healthy" if ai_health.get("status") in ("healthy", "ok", "degraded") else "unhealthy"
+    except Exception as e:
+        dependencies["ai_services"] = f"unhealthy: {str(e)}"
 
     overall = "degraded" if any("unhealthy" in v for v in dependencies.values()) else "healthy"
     return HealthResponse(
