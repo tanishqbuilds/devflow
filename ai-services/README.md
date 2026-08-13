@@ -141,40 +141,40 @@ To help test and monitor agent APIs, this service runs a FastAPI endpoint on por
   "version": "1.0.0",
   "uptime_seconds": 150.2,
   "dependencies": {
-    "redis": "healthy",
-    "mongodb": "healthy"
+    "database": "healthy",
+    "llm": "healthy (Groq Cloud - llama-3.3-70b-versatile)"
   }
 }
 ```
 
 ---
 
-## 🚀 Local Development Setup
+## 🚀 Local Development Setup (Without Docker)
 
-To run the AI services locally (without Docker):
+To run the AI services locally:
 
 ### 1. Environment Configuration
 
-Create a `.env` file in the `ai-services/` directory:
+Ensure `ai-services/.env` or the root `.env` contains:
 
 ```env
-REDIS_URL=redis://localhost:6379/0
-MONGO_URL=mongodb://localhost:27017
+DATABASE_URL=postgresql://postgres:[PASSWORD]@[YOUR-HOST]:5432/postgres
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
+LLM_MODEL=llama-3.3-70b-versatile
 LLM_MODEL_SMART=llama-3.3-70b-versatile
 LLM_MODEL_FAST=llama-3.1-8b-instant
-LLM_QUALITY_REVIEW=true
+LLM_QUALITY_REVIEW=false
 ```
 
 ### 2. Set Up Virtual Environment
 
 ```bash
 # Create virtual environment
-python -m venv venv
+python3 -m venv .venv
 
 # Activate virtual environment
-source venv/bin/activate # On Windows use: venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -183,7 +183,9 @@ pip install -r requirements.txt
 ### 3. Run the Service
 
 ```bash
-python main.py
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+# or from root: make local-ai
 ```
 
-The server will initialize and begin listening on `http://localhost:8001`. You can access the Swagger UI at `http://localhost:8001/docs`.
+The server will begin listening on `http://localhost:8001`. You can access the Swagger UI at `http://localhost:8001/docs`.
+

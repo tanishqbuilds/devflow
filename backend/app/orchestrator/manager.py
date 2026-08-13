@@ -1,11 +1,11 @@
 """Orchestration manager.
 
 Responsibilities:
-* Enqueue analysis jobs onto a Redis queue.
+* Enqueue analysis jobs into the in-memory job queue.
 * Run background worker(s) that pop jobs and drive the workflow.
-* Subscribe to the per-project event channel published by ai-services, persist
-  every event to PostgreSQL, and append it to a durable Redis buffer so that
-  late-joining WebSocket clients can replay the full run.
+* Stream events directly from ai-services over HTTP, persist every event to
+  PostgreSQL / Supabase, buffer events in the in-memory event bus, and broadcast
+  them to connected WebSockets.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.db.redis import event_buffer_key, event_channel, get_redis
+from app.services.event_bus import event_bus
 from app.services import projects as project_service
 from app.services.ai_client import ai_services
 
@@ -26,102 +26,104 @@ _shutdown = asyncio.Event()
 
 
 async def enqueue_analysis(project_id: str) -> None:
-    redis = get_redis()
-    await redis.lpush(settings.analyze_queue, project_id)
+    await event_bus.enqueue_job(project_id)
     logger.info("Enqueued analysis job for project %s", project_id)
 
 
-async def _buffer_event(redis, project_id: str, raw: str) -> None:
-    key = event_buffer_key(project_id)
-    await redis.rpush(key, raw)
-    await redis.ltrim(key, -2000, -1)
-    await redis.expire(key, settings.event_buffer_ttl_seconds)
-
-
 async def _consume_run(project_id: str) -> None:
-    """Subscribe to the project's event channel and persist events until the run
-    completes or times out."""
-    redis = get_redis()
-    pubsub = redis.pubsub()
-    channel = event_channel(project_id)
-    await pubsub.subscribe(channel)
-
-    # Trigger the AI workflow only after we're subscribed, so no early events are lost.
+    """Stream events from ai-services, buffer in memory, and persist to database."""
     deadline = asyncio.get_event_loop().time() + settings.run_timeout_seconds
     attempt = 0
+    inputs_ready = False
+    idea, title = "", None
+
     while not _shutdown.is_set():
         try:
-            await ai_services.run_workflow(project_id, *await _project_inputs(project_id))
+            idea, title = await _project_inputs(project_id)
+            inputs_ready = True
             break
         except Exception as exc:
+            logger.error("Failed to load project inputs for %s: %s", project_id, exc)
+            await project_service.set_status(project_id, "failed", error=f"Project inputs error: {exc}")
+            return
+
+    if not inputs_ready:
+        return
+
+    while not _shutdown.is_set():
+        try:
             attempt += 1
-            delay = min(30.0, 2 ** min(attempt, 5))
-            logger.warning("AI service unavailable for %s (attempt %d); retrying in %.0fs: %s", project_id, attempt, delay, exc)
-            await project_service.set_status(project_id, "queued", error=f"AI service unavailable; reconnecting (attempt {attempt})")
-            if asyncio.get_event_loop().time() + delay >= deadline:
-                await project_service.set_status(project_id, "failed", error="AI service recovery deadline exceeded")
-                await pubsub.unsubscribe(channel); await pubsub.aclose(); return
-            await asyncio.sleep(delay)
-    try:
-        while not _shutdown.is_set():
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                logger.warning("Run %s timed out", project_id)
-                await project_service.set_status(project_id, "failed", error="orchestration timed out")
-                break
+            logger.info("Connecting to AI service stream for project %s (attempt %d)", project_id, attempt)
+            async for event in ai_services.stream_workflow(project_id, idea, title):
+                if _shutdown.is_set():
+                    break
 
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=min(remaining, 5.0))
-            if message is None:
-                continue
+                # Broadcast to WebSockets & buffer in memory
+                await event_bus.publish(project_id, event)
 
-            raw = message.get("data")
-            if not raw:
-                continue
-            try:
-                event = json.loads(raw)
-            except (TypeError, ValueError):
-                continue
+                # Persist to Supabase / PostgreSQL
+                await project_service.apply_event(project_id, event)
 
-            await _buffer_event(redis, project_id, raw)
-            await project_service.apply_event(project_id, event)
+                if event.get("type") == "run_complete":
+                    await project_service.set_status(project_id, "complete", progress=100)
+                    logger.info("Run %s complete", project_id)
+                    return
+                if event.get("type") == "run_failed":
+                    missing = ", ".join(event.get("missing_sections") or [])
+                    await project_service.set_status(
+                        project_id, "failed", error=f"Incomplete AI output: {missing}"
+                    )
+                    logger.error("Run %s incomplete: %s", project_id, missing)
+                    return
 
-            if event.get("type") == "run_complete":
+            # If stream finished cleanly without explicit run_complete / run_failed
+            doc = await project_service.get_project(project_id)
+            if doc and doc.get("status") == "running":
                 await project_service.set_status(project_id, "complete", progress=100)
-                logger.info("Run %s complete", project_id)
-                break
-            if event.get("type") == "run_failed":
-                missing=", ".join(event.get("missing_sections") or [])
-                await project_service.set_status(project_id,"failed",error=f"Incomplete AI output: {missing}")
-                logger.error("Run %s incomplete: %s",project_id,missing)
-                break
-    finally:
-        await pubsub.unsubscribe(channel)
-        await pubsub.aclose()
+            return
+
+        except Exception as exc:
+            if asyncio.get_event_loop().time() >= deadline:
+                logger.error("AI service recovery deadline exceeded for %s: %s", project_id, exc)
+                await project_service.set_status(project_id, "failed", error="AI service recovery deadline exceeded")
+                return
+
+            delay = min(15.0, 2 ** min(attempt, 4))
+            logger.warning(
+                "AI service stream error for %s (attempt %d); retrying in %.0fs: %s",
+                project_id,
+                attempt,
+                delay,
+                exc,
+            )
+            await project_service.set_status(
+                project_id, "queued", error=f"AI service reconnecting (attempt {attempt})"
+            )
+            await asyncio.sleep(delay)
 
 
 async def _project_inputs(project_id: str) -> tuple[str, str | None]:
     doc = await project_service.get_project(project_id)
     if not doc:
         raise RuntimeError(f"project {project_id} not found")
-    inputs=doc.get("manager_inputs") or {}
-    enriched=doc["idea"]
+    inputs = doc.get("manager_inputs") or {}
+    enriched = doc["idea"]
     if inputs:
         enriched += "\n\nMANAGER-PROVIDED DELIVERY CONSTRAINTS (authoritative):\n" + json.dumps(inputs)
     return enriched, doc.get("title")
 
 
 async def _worker(worker_id: int) -> None:
-    redis = get_redis()
     logger.info("Orchestrator worker %d online", worker_id)
     while not _shutdown.is_set():
         try:
-            popped = await redis.brpop(settings.analyze_queue, timeout=2)
-            if popped is None:
+            project_id = await event_bus.dequeue_job(timeout=2.0)
+            if project_id is None:
                 continue
-            _, project_id = popped
             logger.info("Worker %d picked up project %s", worker_id, project_id)
             await project_service.set_status(project_id, "running", progress=0)
             await _consume_run(project_id)
+            event_bus.mark_job_done()
         except asyncio.CancelledError:
             break
         except Exception:

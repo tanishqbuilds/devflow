@@ -87,13 +87,62 @@ CREATE INDEX IF NOT EXISTS ai_responses_project_created_idx
 """
 
 
+import ssl
+import urllib.parse
+
+from app.core.config import settings
+from app.core.logging import get_logger
+
+logger = get_logger("db.postgres")
+_pool: asyncpg.Pool | None = None
+
+
+def _prepare_dsn_and_ssl(dsn: str) -> tuple[str, Any]:
+    url = dsn.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+
+    parsed = urllib.parse.urlparse(url)
+    query_params = urllib.parse.parse_qs(parsed.query)
+    ssl_mode = query_params.get("sslmode", [None])[0]
+
+    # Strip sslmode parameter from query if present for asyncpg compatibility
+    if "sslmode" in query_params:
+        clean_query = urllib.parse.urlencode(
+            {k: v for k, v in query_params.items() if k != "sslmode"}, doseq=True
+        )
+        url = urllib.parse.urlunparse(parsed._replace(query=clean_query))
+
+    ssl_arg = None
+    if ssl_mode in ("require", "verify-ca", "verify-full"):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ssl_arg = ctx
+    elif ssl_mode == "disable":
+        ssl_arg = None
+    elif parsed.hostname and parsed.hostname not in ("localhost", "127.0.0.1", "postgres"):
+        # Cloud/Supabase hosts require SSL
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ssl_arg = ctx
+
+    return url, ssl_arg
+
+
 async def init_postgres() -> None:
     global _pool
-    _pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
+    clean_dsn, ssl_ctx = _prepare_dsn_and_ssl(settings.database_url)
+    kwargs: dict[str, Any] = {"min_size": 1, "max_size": 10, "statement_cache_size": 0}
+    if ssl_ctx is not None:
+        kwargs["ssl"] = ssl_ctx
+
+    _pool = await asyncpg.create_pool(clean_dsn, **kwargs)
     async with _pool.acquire() as conn:
         await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
         await conn.execute(SCHEMA)
-    logger.info("PostgreSQL schema ensured")
+    logger.info("PostgreSQL / Supabase schema ensured")
 
 
 def pool() -> asyncpg.Pool:

@@ -15,14 +15,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import redis.asyncio as aioredis
-
 from agents.registry import AGENTS, get_agent
 from memory.project_memory import ProjectMemory
 from services.cost import compute_cost
 from services.diagram import build_diagram, build_mermaid
 from utils.logging import get_logger
-from workflows.events import EventEmitter
+from workflows.events import EventEmitter, EventListener
 from workflows.supervisor import CEOSupervisor
 
 logger = get_logger("workflow.engine")
@@ -64,8 +62,14 @@ TOTAL_UNITS = len(AGENTS)
 
 
 class WorkflowEngine:
-    def __init__(self, redis: aioredis.Redis, project_id: str, user_id: str | None = None):
-        self._emitter = EventEmitter(redis, project_id)
+    def __init__(
+        self,
+        project_id: str,
+        user_id: str | None = None,
+        listener: EventListener | None = None,
+        redis: Any = None,
+    ):
+        self._emitter = EventEmitter(project_id, listener=listener)
         self._project_id = project_id
         self._memory = ProjectMemory(project_id, user_id)
         self._ctx: dict[str, Any] = {}

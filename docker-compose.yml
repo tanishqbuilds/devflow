@@ -44,11 +44,8 @@ services:
     environment:
       - BYPASS_AUTH=${BYPASS_AUTH:-true}
       - UNLIMITED_CREDENTIALS=${UNLIMITED_CREDENTIALS:-false}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set in .env}
     depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
       ai-services:
         condition: service_healthy
     restart: unless-stopped
@@ -71,12 +68,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://devflow:devflow@postgres:5432/devflow}
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set in .env}
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -109,39 +101,6 @@ services:
       retries: 5
       start_period: 30s
 
-  redis:
-    container_name: devflow-redis
-    image: redis:7
-    ports:
-      - "${PORT_REDIS:-6379}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  postgres:
-    container_name: devflow-postgres
-    image: postgres:16-alpine
-    ports:
-      - "${PORT_POSTGRES:-5432}:5432"
-    environment:
-      POSTGRES_USER: devflow
-      POSTGRES_PASSWORD: devflow
-      POSTGRES_DB: devflow
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devflow -d devflow"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
 volumes:
-  postgres_data:
-    name: devflow_postgres_data
   langflow_data:
     name: devflow_langflow_data

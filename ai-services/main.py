@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 
 import httpx
 from dotenv import load_dotenv
-import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, status
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -12,7 +11,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from api.routes import router as api_router
-from services.redis_client import close_redis
+from services.db_client import close_db, get_db_pool
 from utils.env import load_runtime_env
 from utils.logging import get_logger
 
@@ -26,7 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info("ai-services starting (provider=%s, model=%s)",
                 os.getenv("LLM_PROVIDER", "groq"), os.getenv("LLM_MODEL", "llama-3.3-70b-versatile"))
     yield
-    await close_redis()
+    await close_db()
     logger.info("ai-services shut down")
 
 
@@ -55,7 +54,6 @@ async def custom_swagger_ui_html():
     return HTMLResponse(content=html_content, status_code=response.status_code)
 
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 APP_VERSION = "1.0.0"
 START_TIME = time.time()
 
@@ -69,15 +67,18 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"redis": "unknown", "llm": "unknown"}
+    dependencies = {"database": "unknown", "llm": "unknown"}
 
     try:
-        r = aioredis.from_url(REDIS_URL, socket_timeout=2.0)
-        await r.ping()
-        await r.aclose()
-        dependencies["redis"] = "healthy"
+        pool = await get_db_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            dependencies["database"] = "healthy"
+        else:
+            dependencies["database"] = "unhealthy: database pool unavailable"
     except Exception as e:
-        dependencies["redis"] = f"unhealthy: {str(e)}"
+        dependencies["database"] = f"unhealthy: {str(e)}"
 
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")

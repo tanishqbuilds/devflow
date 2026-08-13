@@ -1,13 +1,12 @@
 """Per-agent structured output storage with versioning and scoped retrieval.
 
-Stores each agent's validated output as a versioned JSON record, cached in Redis
-for hot reads during a workflow run, and persisted to PostgreSQL for durability.
+Stores each agent's validated output as a versioned JSON record, cached in memory
+for hot reads during a workflow run, and persisted to PostgreSQL / Supabase for durability.
 Downstream agents receive only the upstream sections they depend on, minimizing
 token waste and improving context quality.
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from services.db_client import (
@@ -16,11 +15,15 @@ from services.db_client import (
     save_agent_output as db_save_agent_output,
     save_quality_record,
 )
-from services.redis_client import get_redis
 from tools.project_context import DEPENDENCIES
 from utils.logging import get_logger
 
 logger = get_logger("memory.agent_store")
+
+# Global in-memory cache for fast agent-to-agent output sharing during runs:
+# { project_id: { agent_id: { "agent_id": str, "section": str, "version": int, "data": dict } } }
+_AGENT_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
+_QUALITY_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 
 # Maps agent_id -> the section key it produces.
 AGENT_SECTION: dict[str, str] = {
@@ -44,62 +47,44 @@ class AgentStore:
     def __init__(self, project_id: str, user_id: str = "system"):
         self.project_id = project_id
         self.user_id = user_id
-        self._cache_key = f"agent_store:{project_id}"
 
     async def save_output(
         self, agent_id: str, section: str, data: dict[str, Any], version: int = 1
     ) -> None:
         """Store an agent's validated output with versioning."""
-        # 1. Persist to PostgreSQL
+        # 1. Persist to PostgreSQL / Supabase
         await db_save_agent_output(self.project_id, self.user_id, agent_id, section, data, version)
 
-        # 2. Cache in Redis for hot reads during the run
-        redis = get_redis()
-        if redis:
-            try:
-                payload = json.dumps(
-                    {"agent_id": agent_id, "section": section, "version": version, "data": data},
-                    default=str,
-                )
-                await redis.hset(self._cache_key, agent_id, payload)
-                await redis.expire(self._cache_key, 86400)  # 24h TTL
-            except Exception as exc:
-                logger.warning("Failed to cache agent output in Redis: %s", exc)
+        # 2. Cache in memory for hot reads during the run
+        if self.project_id not in _AGENT_CACHE:
+            _AGENT_CACHE[self.project_id] = {}
+        _AGENT_CACHE[self.project_id][agent_id] = {
+            "agent_id": agent_id,
+            "section": section,
+            "version": version,
+            "data": data,
+        }
 
     async def get_output(self, agent_id: str) -> dict[str, Any] | None:
         """Retrieve the latest output for a specific agent (cache-first)."""
-        # 1. Try Redis cache
-        redis = get_redis()
-        if redis:
-            try:
-                cached = await redis.hget(self._cache_key, agent_id)
-                if cached:
-                    record = json.loads(cached)
-                    return record.get("data")
-            except Exception as exc:
-                logger.debug("Redis cache miss for agent %s: %s", agent_id, exc)
+        # 1. Try in-memory cache
+        if self.project_id in _AGENT_CACHE and agent_id in _AGENT_CACHE[self.project_id]:
+            return _AGENT_CACHE[self.project_id][agent_id].get("data")
 
-        # 2. Fall back to PostgreSQL
+        # 2. Fall back to PostgreSQL / Supabase
         record = await fetch_agent_output(self.project_id, agent_id)
         return record
 
     async def get_all_outputs(self) -> dict[str, dict[str, Any]]:
         """Retrieve all latest agent outputs for this project, keyed by section."""
-        # 1. Try Redis cache
-        redis = get_redis()
-        if redis:
-            try:
-                all_cached = await redis.hgetall(self._cache_key)
-                if all_cached:
-                    result = {}
-                    for _agent_id, raw in all_cached.items():
-                        record = json.loads(raw)
-                        result[record["section"]] = record["data"]
-                    return result
-            except Exception as exc:
-                logger.debug("Redis cache miss for all outputs: %s", exc)
+        # 1. Try in-memory cache
+        if self.project_id in _AGENT_CACHE and _AGENT_CACHE[self.project_id]:
+            result = {}
+            for _agent_id, record in _AGENT_CACHE[self.project_id].items():
+                result[record["section"]] = record["data"]
+            return result
 
-        # 2. Fall back to PostgreSQL
+        # 2. Fall back to PostgreSQL / Supabase
         return await fetch_agent_outputs(self.project_id)
 
     async def get_scoped_outputs(self, agent_id: str) -> dict[str, Any]:
@@ -126,29 +111,16 @@ class AgentStore:
         """Track quality gate outcomes per agent."""
         await save_quality_record(self.project_id, agent_id, passed, issues)
 
-        # Cache quality scores in Redis
-        redis = get_redis()
-        if redis:
-            try:
-                quality_key = f"quality:{self.project_id}"
-                record = json.dumps(
-                    {"agent_id": agent_id, "passed": passed, "issues": issues},
-                    default=str,
-                )
-                await redis.hset(quality_key, agent_id, record)
-                await redis.expire(quality_key, 86400)
-            except Exception as exc:
-                logger.debug("Failed to cache quality score: %s", exc)
+        if self.project_id not in _QUALITY_CACHE:
+            _QUALITY_CACHE[self.project_id] = {}
+        _QUALITY_CACHE[self.project_id][agent_id] = {
+            "agent_id": agent_id,
+            "passed": passed,
+            "issues": issues,
+        }
 
     async def get_decision_log(self) -> list[dict[str, Any]]:
         """Retrieve CEO/PM decisions and quality outcomes for this project."""
-        redis = get_redis()
-        if not redis:
-            return []
-        try:
-            quality_key = f"quality:{self.project_id}"
-            records = await redis.hgetall(quality_key)
-            return [json.loads(v) for v in records.values()] if records else []
-        except Exception as exc:
-            logger.debug("Failed to read decision log: %s", exc)
-            return []
+        if self.project_id in _QUALITY_CACHE:
+            return list(_QUALITY_CACHE[self.project_id].values())
+        return []

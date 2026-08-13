@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
+import urllib.parse
 from typing import Any
 
 import asyncpg
@@ -21,14 +23,50 @@ DATABASE_URL = os.getenv(
 _pool: asyncpg.Pool | None = None
 
 
+def _prepare_dsn_and_ssl(dsn: str) -> tuple[str, Any]:
+    url = dsn.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+
+    parsed = urllib.parse.urlparse(url)
+    query_params = urllib.parse.parse_qs(parsed.query)
+    ssl_mode = query_params.get("sslmode", [None])[0]
+
+    if "sslmode" in query_params:
+        clean_query = urllib.parse.urlencode(
+            {k: v for k, v in query_params.items() if k != "sslmode"}, doseq=True
+        )
+        url = urllib.parse.urlunparse(parsed._replace(query=clean_query))
+
+    ssl_arg = None
+    if ssl_mode in ("require", "verify-ca", "verify-full"):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ssl_arg = ctx
+    elif ssl_mode == "disable":
+        ssl_arg = None
+    elif parsed.hostname and parsed.hostname not in ("localhost", "127.0.0.1", "postgres"):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        ssl_arg = ctx
+
+    return url, ssl_arg
+
+
 async def get_db_pool() -> asyncpg.Pool | None:
     """Return the global asyncpg connection pool."""
     global _pool
     if _pool is not None:
         return _pool
     try:
-        _pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=5)
-        logger.info("Connected to PostgreSQL database for AI Services")
+        clean_dsn, ssl_ctx = _prepare_dsn_and_ssl(DATABASE_URL)
+        kwargs: dict[str, Any] = {"min_size": 1, "max_size": 5, "statement_cache_size": 0}
+        if ssl_ctx is not None:
+            kwargs["ssl"] = ssl_ctx
+        _pool = await asyncpg.create_pool(clean_dsn, **kwargs)
+        logger.info("Connected to PostgreSQL / Supabase database for AI Services")
         return _pool
     except Exception as exc:
         logger.warning("Could not connect to PostgreSQL database: %s", exc)
