@@ -77,7 +77,8 @@ def build_agent_graph(
             ("system", f"CRITICAL CEO SUPERVISOR DIRECTIVE (you MUST address this):\n{directive}")
         )
     sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}\n\nResults from callable specialist tools:\n{tool_insights}"))
-    sys_messages.append(("system", "Return only one valid JSON object matching the requested schema. Do not return a function/tool envelope, markdown, or commentary."))
+    schema_str = json.dumps(schema.model_json_schema(), indent=2).replace("{", "{{").replace("}", "}}")
+    sys_messages.append(("system", f"Return only one valid JSON object matching the following schema:\n```json\n{schema_str}\n```\nDo not return a function/tool envelope, markdown, or commentary."))
 
     generation_prompt = ChatPromptTemplate.from_messages(
         [
