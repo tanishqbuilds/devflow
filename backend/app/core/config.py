@@ -29,6 +29,7 @@ class Settings:
         "DATABASE_URL", "postgresql://devflow:devflow@postgres:5432/devflow"
     )
     ai_services_url: str = os.getenv("AI_SERVICES_URL", "http://ai-services:8001")
+    ai_internal_api_key: str = os.getenv("AI_INTERNAL_API_KEY", "")
     clerk_secret_key: str = os.getenv("CLERK_SECRET_KEY", "")
     clerk_issuer_url: str = os.getenv("CLERK_ISSUER_URL", "").rstrip("/")
     bypass_auth: bool = os.getenv("BYPASS_AUTH", "true").lower() in ("true", "1", "yes")

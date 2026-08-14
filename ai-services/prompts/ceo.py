@@ -32,7 +32,9 @@ CEO_REVIEW_PROMPT = (
     "4. ALIGNMENT — Do all agents respect the CEO's key_decisions from the executive summary?\n\n"
     "If the plan passes, say so with a brief assessment. If it fails, identify the specific agents "
     "that need to re-run and provide targeted, actionable directives for each. Limit re-run "
-    "directives to at most 3 agents to keep costs manageable."
+    "directives to at most 3 agents to keep costs manageable. The agent_id field MUST be one of "
+    "these exact IDs: ceo, product_manager, architect, sprint_planner, risk, team_allocation, "
+    "timeline, integration."
 )
 
 

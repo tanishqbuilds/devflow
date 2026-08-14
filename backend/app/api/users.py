@@ -32,7 +32,7 @@ async def sync_user(req: SyncUserRequest, current: CurrentUser=Depends(current_u
 async def list_users(current: CurrentUser=Depends(current_user)) -> dict[str, Any]:
     """List all users for task assignment dropdowns."""
     try:
-        users = await user_service.list_users()
+        users = await user_service.list_users(current.id)
         return {"users": users}
     except Exception as exc:
         logger.error("Failed to list users: %s", exc)

@@ -29,6 +29,16 @@ async def upsert_user(
     new_user = await fetchrow("SELECT * FROM users WHERE clerk_user_id = $1", clerk_id)
     return dict(new_user) if new_user else {}
 
-async def list_users() -> list[dict[str, Any]]:
-    rows = await fetch("SELECT clerk_user_id as id, email, first_name, last_name, image_url, role FROM users ORDER BY first_name ASC, email ASC")
+async def list_users(requesting_user_id: str) -> list[dict[str, Any]]:
+    """List only users who share at least one workspace with the caller."""
+    rows = await fetch(
+        """SELECT DISTINCT u.clerk_user_id AS id, u.email, u.first_name,
+                  u.last_name, u.image_url, u.role
+           FROM workspace_members mine
+           JOIN workspace_members peer ON peer.workspace_id=mine.workspace_id
+           JOIN users u ON u.clerk_user_id=peer.user_id
+           WHERE mine.user_id=$1
+           ORDER BY u.first_name ASC, u.email ASC""",
+        requesting_user_id,
+    )
     return [dict(r) for r in rows]

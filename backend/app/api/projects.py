@@ -13,6 +13,7 @@ from app.models.project import (
     AnalyzeResponse,
     ChatRequest,
     MigrateRequest,
+    ProjectDocumentCreate,
     migration_idea,
 )
 from app.orchestrator.manager import enqueue_analysis
@@ -27,8 +28,14 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.post("/analyze", response_model=AnalyzeResponse, status_code=202)
 async def analyze(req: AnalyzeRequest, user: CurrentUser = Depends(current_user)) -> AnalyzeResponse:
     """Kick off the autonomous AI organization on a raw product idea."""
-    manager_inputs=req.model_dump(exclude={"idea","title"})
+    manager_inputs=req.model_dump(exclude={"idea","title","source_documents"})
     doc = await project_service.create_project(req.idea, req.title, user.id, manager_inputs)
+    for source in req.source_documents:
+        await project_service.create_source_document(
+            doc["id"], user.id, title=source.title, content=source.content,
+            source_type=source.source_type, mime_type=source.mime_type,
+            metadata=source.metadata,
+        )
     await enqueue_analysis(doc["id"])
     return AnalyzeResponse(project_id=doc["id"], status="queued")
 
@@ -39,18 +46,36 @@ async def migrate(req: MigrateRequest, user: CurrentUser = Depends(current_user)
     idea = migration_idea(req.source, req.content)
     title = req.title or f"Imported · {req.content.strip().splitlines()[0][:48]}"
     doc = await project_service.create_project(idea, title, user.id)
+    await project_service.create_source_document(
+        doc["id"], user.id, title=title, content=req.content,
+        source_type=req.source if req.source in {"spec","repo","tickets","file"} else "text",
+        mime_type="text/plain", metadata={"migration_source": req.source, "authoritative": True},
+    )
     await enqueue_analysis(doc["id"])
     return AnalyzeResponse(project_id=doc["id"], status="queued")
 
 
+class RetryProjectRequest(BaseModel):
+    target_agents: list[str] = Field(default_factory=list, max_length=8)
+
+
 @router.post("/{project_id}/retry", response_model=AnalyzeResponse, status_code=202)
-async def retry_project(project_id: str, user: CurrentUser = Depends(current_user)) -> AnalyzeResponse:
+async def retry_project(
+    project_id: str,
+    req: RetryProjectRequest | None = None,
+    user: CurrentUser = Depends(current_user),
+) -> AnalyzeResponse:
     """Retry all failed or incomplete sections for a project without losing already completed deliverables."""
     doc = await project_service.get_project(project_id, user.id)
     if not doc:
         raise HTTPException(status_code=404, detail="project not found")
     await project_service.set_status(project_id, "queued", progress=doc.get("progress", 0), error=None)
-    await enqueue_analysis(project_id)
+    targets = list(req.target_agents) if req else []
+    valid_agents = {"ceo", "product_manager", "architect", "sprint_planner", "risk", "team_allocation", "timeline", "integration"}
+    unknown = sorted(set(targets) - valid_agents)
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"unknown target agents: {', '.join(unknown)}")
+    await enqueue_analysis(project_id, targets or None)
     logger.info("Enqueued retry for project %s", project_id)
     return AnalyzeResponse(project_id=project_id, status="queued")
 
@@ -102,6 +127,50 @@ async def get_project(project_id: str, user: CurrentUser = Depends(current_user)
     if not doc:
         raise HTTPException(status_code=404, detail="project not found")
     return doc
+
+
+@router.post("/{project_id}/documents", status_code=201)
+async def add_project_document(
+    project_id: str,
+    req: ProjectDocumentCreate,
+    user: CurrentUser = Depends(current_user),
+) -> dict[str, Any]:
+    try:
+        document = await project_service.create_source_document(
+            project_id,
+            user.id,
+            title=req.title,
+            content=req.content,
+            source_type=req.source_type,
+            mime_type=req.mime_type,
+            metadata=req.metadata,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="project not found")
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    return {"document": document}
+
+
+@router.get("/{project_id}/documents")
+async def list_project_documents(
+    project_id: str, user: CurrentUser = Depends(current_user)
+) -> dict[str, Any]:
+    try:
+        documents = await project_service.list_source_documents(project_id, user.id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="project not found")
+    return {"documents": documents}
+
+
+@router.get("/{project_id}/ai-provenance")
+async def get_ai_provenance(
+    project_id: str, user: CurrentUser = Depends(current_user)
+) -> dict[str, Any]:
+    try:
+        return await project_service.ai_provenance(project_id, user.id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="project not found")
 
 
 class UpdateBacklogRequest(BaseModel):

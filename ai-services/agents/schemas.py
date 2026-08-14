@@ -7,9 +7,10 @@ in the backend. This keeps small local models reliable.
 """
 from __future__ import annotations
 
-from typing import Any, List, Literal
+import json
+from typing import Any, List, Literal, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 Priority = Literal["high", "medium", "low"]
 Severity = Literal["critical", "high", "medium", "low"]
@@ -23,32 +24,99 @@ IntegrationCategory = Literal[
 ]
 
 
+def _as_string_list(value: Any) -> list[str]:
+    """Coerce common small-model list variants without discarding detail."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split("\n") if item.strip()]
+    if isinstance(value, dict):
+        return [
+            f"{key}: {json.dumps(detail, ensure_ascii=False, separators=(',', ':')) if isinstance(detail, (dict, list)) else detail}"
+            for key, detail in value.items()
+        ]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, dict):
+                label = item.get("name") or item.get("title") or item.get("decision") or item.get("component")
+                detail = item.get("description") or item.get("rationale") or item.get("reason")
+                result.append(
+                    f"{label}: {detail}" if label and detail else json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+                )
+            elif item is not None:
+                result.append(str(item))
+        return result
+    return [str(value)]
+
+
 # --------------------------------------------------------------------------- #
 # CEO Agent — Executive Summary
 # --------------------------------------------------------------------------- #
 class ExecutiveSummary(BaseModel):
-    project_title: str = Field(..., description="A concise, marketable product name")
-    tagline: str = Field(..., description="One-sentence positioning statement")
-    vision: str = Field(..., description="The long-term vision for the product")
-    overview: str = Field(..., description="2-4 sentence project overview")
-    business_goals: List[str] = Field(..., min_length=2)
-    success_criteria: List[str] = Field(..., min_length=2)
-    target_users: List[str] = Field(..., min_length=1)
-    key_differentiators: List[str] = Field(..., min_length=1)
-    competitive_landscape: str = Field(
+    project_title: str = Field(
+        default="Project Plan",
+        validation_alias=AliasChoices("project_title", "product_name", "title", "name"),
+        description="A concise, marketable product name",
+    )
+    tagline: str = Field(default="Smart Software Architecture", description="One-sentence positioning statement")
+    vision: str = Field(default="Deliver scalable, high-impact software", description="The long-term vision for the product")
+    overview: str = Field(
+        default="",
+        validation_alias=AliasChoices("overview", "description", "summary", "project_overview"),
+        description="2-4 sentence project overview",
+    )
+    business_goals: List[str] = Field(default_factory=list, validation_alias=AliasChoices("business_goals", "goals"))
+    success_criteria: List[str] = Field(default_factory=list, validation_alias=AliasChoices("success_criteria", "metrics"))
+    target_users: List[str] = Field(default_factory=list, validation_alias=AliasChoices("target_users", "users", "target_audience"))
+    key_differentiators: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("key_differentiators", "differentiators", "differentiating_features"),
+    )
+    competitive_landscape: Any = Field(
         default="", description="Brief analysis of competitive landscape and positioning"
     )
-    go_to_market: str = Field(
+    go_to_market: Any = Field(
         default="", description="High-level go-to-market strategy or launch approach"
     )
     key_decisions: List[str] = Field(
         default_factory=list,
         description="Binding strategic decisions downstream agents must respect",
     )
-    complexity_score: int = Field(..., ge=1, le=100, description="1=trivial, 100=extreme")
-    complexity_label: Literal["Low", "Moderate", "High", "Very High"]
-    estimated_duration_weeks: int = Field(..., ge=1, le=260)
-    recommended_team_size: int = Field(..., ge=1, le=200)
+    complexity_score: int = Field(default=50, ge=1, le=100, description="1=trivial, 100=extreme")
+    complexity_label: str = Field(
+        default="Moderate",
+        validation_alias=AliasChoices("complexity_label", "complexity"),
+    )
+    estimated_duration_weeks: int = Field(
+        default=12,
+        ge=1,
+        le=260,
+        validation_alias=AliasChoices("estimated_duration_weeks", "duration_weeks", "estimated_duration"),
+    )
+    recommended_team_size: int = Field(
+        default=4,
+        ge=1,
+        le=200,
+        validation_alias=AliasChoices("recommended_team_size", "recommended_core_team_size", "team_size"),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        for f in ("target_users", "business_goals", "success_criteria", "key_differentiators", "key_decisions"):
+            val = data.get(f)
+            if isinstance(val, str):
+                data[f] = [x.strip() for x in val.split(",") if x.strip()]
+        for f in ("competitive_landscape", "go_to_market"):
+            if isinstance(data.get(f), (dict, list)):
+                import json
+                data[f] = json.dumps(data[f])
+        return data
 
 
 # --------------------------------------------------------------------------- #
@@ -147,10 +215,24 @@ class ArchitectureLayer(BaseModel):
     @classmethod
     def normalize_layer(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            if not data.get("components"):
+                data["components"] = data.get("key_components") or data.get("services") or []
+            if not data.get("technologies"):
+                data["technologies"] = (
+                    data.get("recommended_technologies")
+                    or data.get("technology_stack")
+                    or data.get("tech_stack")
+                    or []
+                )
+            if not data.get("decisions"):
+                data["decisions"] = (
+                    data.get("important_architectural_decisions")
+                    or data.get("design_decisions")
+                    or data.get("key_decisions")
+                    or []
+                )
             for key in ["components", "technologies", "decisions", "key_entities"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
         return data
 
 
@@ -167,10 +249,26 @@ class ArchitectureBundle(BaseModel):
     @classmethod
     def normalize_arch(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            nested = data.get("architecture")
+            if isinstance(nested, dict):
+                data = {**nested, **{k: v for k, v in data.items() if k != "architecture"}}
+            layers = data.get("layers")
+            if isinstance(layers, list):
+                for layer in layers:
+                    if not isinstance(layer, dict):
+                        continue
+                    name = str(layer.get("name") or layer.get("layer") or "").lower().strip()
+                    if name in {"frontend", "backend", "database", "infrastructure"}:
+                        data[name] = layer
+            if not data.get("scalability_plan") and isinstance(data.get("infrastructure"), dict):
+                infra = data["infrastructure"]
+                data["scalability_plan"] = [
+                    f"{key}: {json.dumps(infra[key], ensure_ascii=False, separators=(',', ':'))}"
+                    for key in ("hosting", "scaling", "observability", "ci_cd")
+                    if infra.get(key)
+                ]
             for key in ["technology_recommendations", "scalability_plan", "integration_points"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split("\n") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
         return data
 
 
@@ -180,6 +278,14 @@ class ArchitectureBundle(BaseModel):
 class Epic(BaseModel):
     title: str = Field(default="")
     description: str = Field(default="")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_epic(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data["title"] = data.get("title") or data.get("name") or ""
+            data["description"] = data.get("description") or data.get("goal") or data["title"]
+        return data
 
 
 class TaskItem(BaseModel):
@@ -204,12 +310,22 @@ class TaskItem(BaseModel):
     @classmethod
     def normalize_task(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            if not data.get("title"):
+                data["title"] = data.get("name") or data.get("task") or ""
             if "description" not in data or not data["description"]:
                 data["description"] = data.get("definition_of_done") or data.get("title") or ""
             if "estimated_days" not in data:
                 data["estimated_days"] = float(data.get("estimate") or data.get("days") or 3.0)
             if "category" not in data:
                 data["category"] = "backend"
+            if not data.get("definition_of_done"):
+                done = data.get("acceptance_criteria") or data.get("done_criteria") or ""
+                data["definition_of_done"] = "; ".join(_as_string_list(done))
+            sprint = data.get("sprint")
+            if isinstance(sprint, str):
+                import re
+                match = re.search(r"\d+", sprint)
+                data["sprint"] = int(match.group()) if match else 1
         return data
 
 
@@ -219,6 +335,28 @@ class Sprint(BaseModel):
     goal: str = Field(default="")
     task_titles: List[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_sprint(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if "number" not in data:
+            data["number"] = data.get("sprint_number") or data.get("id") or 1
+        if isinstance(data.get("number"), str):
+            import re
+            match = re.search(r"\d+", data["number"])
+            data["number"] = int(match.group()) if match else 1
+        if not data.get("name"):
+            data["name"] = data.get("title") or f"Sprint {data['number']}"
+        tasks = data.get("task_titles") or data.get("tasks") or data.get("work_items") or []
+        if isinstance(tasks, list):
+            data["task_titles"] = [
+                str(item.get("title") or item.get("name") or item.get("task") or "")
+                if isinstance(item, dict) else str(item)
+                for item in tasks
+            ]
+        return data
+
 
 class SprintPlan(BaseModel):
     methodology: str = "Scrum"
@@ -226,6 +364,43 @@ class SprintPlan(BaseModel):
     epics: List[Epic] = Field(default_factory=list)
     tasks: List[TaskItem] = Field(default_factory=list)
     sprints: List[Sprint] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_sprint_plan(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        nested = data.get("backlog") or data.get("sprint_plan")
+        if isinstance(nested, dict):
+            data = {**nested, **{k: v for k, v in data.items() if k not in {"backlog", "sprint_plan"}}}
+        for alias in ("backlog_tasks", "task_list", "work_items"):
+            if not data.get("tasks") and isinstance(data.get(alias), list):
+                data["tasks"] = data[alias]
+        if not data.get("tasks"):
+            for value in data.values():
+                if (
+                    isinstance(value, list)
+                    and value
+                    and isinstance(value[0], dict)
+                    and {"story_points", "estimated_days", "definition_of_done"}
+                    & set(value[0])
+                ):
+                    data["tasks"] = value
+                    break
+        # Small models often nest task breakdowns inside each epic. Preserve
+        # those useful objects and promote them to the canonical task list.
+        if not data.get("tasks") and isinstance(data.get("epics"), list):
+            promoted: list[dict[str, Any]] = []
+            for epic in data["epics"]:
+                if not isinstance(epic, dict):
+                    continue
+                epic_title = str(epic.get("title") or epic.get("name") or "")
+                for task in epic.get("tasks") or epic.get("work_items") or []:
+                    if isinstance(task, dict):
+                        promoted.append({"epic": epic_title, **task})
+            if promoted:
+                data["tasks"] = promoted
+        return data
 
 
 # --------------------------------------------------------------------------- #
@@ -255,13 +430,14 @@ class RiskItem(BaseModel):
             if "category" in data and isinstance(data["category"], str):
                 cat = data["category"].lower()
                 valid = {"technical", "product", "delivery", "security", "scalability"}
-                if cat not in valid:
-                    data["category"] = "technical"
+                data["category"] = cat if cat in valid else "technical"
             if "severity" in data and isinstance(data["severity"], str):
                 sev = data["severity"].lower()
                 valid_sev = {"critical", "high", "medium", "low"}
-                if sev not in valid_sev:
-                    data["severity"] = "medium"
+                data["severity"] = sev if sev in valid_sev else "medium"
+            delay_cost = data.get("cost_of_delay_per_week")
+            if isinstance(delay_cost, (int, float)):
+                data["cost_of_delay_per_week"] = str(delay_cost)
         return data
 
 
@@ -309,9 +485,9 @@ class TeamMember(BaseModel):
                 s_map = {"junior": "Junior", "mid": "Mid", "senior": "Senior", "lead": "Lead", "principal": "Principal"}
                 data["seniority"] = s_map.get(s.lower(), s.capitalize() if s else "Senior")
             for key in ["skills", "responsibilities"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
+            if not data.get("owns_area"):
+                data["owns_area"] = data.get("ownership") or data.get("area") or ""
         return data
 
 
@@ -324,10 +500,30 @@ class TeamPlan(BaseModel):
     @classmethod
     def normalize_plan(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            nested = (
+                data.get("team_plan")
+                or data.get("team_allocation")
+                or data.get("staffing_plan")
+                or data.get("resource_plan")
+                or data.get("team")
+            )
+            if isinstance(nested, dict):
+                data = {**nested, **{k: v for k, v in data.items() if k not in {"team_plan", "team_allocation"}}}
+            for alias in ("roles", "team_members", "allocations"):
+                if not data.get("members") and isinstance(data.get(alias), list):
+                    data["members"] = data[alias]
+            if not data.get("members"):
+                for value in data.values():
+                    if (
+                        isinstance(value, list)
+                        and value
+                        and isinstance(value[0], dict)
+                        and {"role", "seniority", "responsibilities", "skills"} & set(value[0])
+                    ):
+                        data["members"] = value
+                        break
             for key in ["staffing_notes", "ownership"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split("\n") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
         return data
 
 
@@ -354,12 +550,9 @@ class MilestoneItem(BaseModel):
             if "phase" in data and isinstance(data["phase"], str):
                 p = data["phase"].lower()
                 valid = {"mvp", "beta", "production", "scaling"}
-                if p not in valid:
-                    data["phase"] = "mvp"
+                data["phase"] = p if p in valid else "mvp"
             for key in ["deliverables", "dependencies", "go_no_go_criteria"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
         return data
 
 
@@ -367,6 +560,35 @@ class TimelinePlan(BaseModel):
     milestones: List[MilestoneItem] = Field(default_factory=list)
     total_duration_weeks: int = Field(default=12, ge=1)
     critical_path: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_timeline_plan(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        nested = (
+            data.get("timeline")
+            or data.get("roadmap")
+            or data.get("delivery_timeline")
+            or data.get("project_timeline")
+            or data.get("implementation_timeline")
+        )
+        if isinstance(nested, dict):
+            data = {**nested, **{k: v for k, v in data.items() if k not in {"timeline", "roadmap"}}}
+        if not data.get("milestones") and isinstance(data.get("phases"), list):
+            data["milestones"] = data["phases"]
+        if not data.get("milestones"):
+            for value in data.values():
+                if (
+                    isinstance(value, list)
+                    and value
+                    and isinstance(value[0], dict)
+                    and {"start_week", "duration_weeks", "deliverables", "go_no_go_criteria"}
+                    & set(value[0])
+                ):
+                    data["milestones"] = value
+                    break
+        return data
 
 
 # --------------------------------------------------------------------------- #
@@ -393,19 +615,43 @@ class IntegrationItem(BaseModel):
             if "category" in data and isinstance(data["category"], str):
                 cat = data["category"].lower()
                 valid = {"github", "calendar", "deployment", "payments", "communication", "analytics", "other"}
-                if cat not in valid:
-                    data["category"] = "other"
+                data["category"] = cat if cat in valid else "other"
             for key in ["steps", "rollback_steps"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split("\n") if x.strip()]
+                data[key] = _as_string_list(data.get(key))
         return data
 
 
 class IntegrationBundle(BaseModel):
     integrations: List[IntegrationItem] = Field(default_factory=list)
     deployment_plan: List[str] = Field(default_factory=list)
-    cicd_recommendations: List[str] = Field(default_factory=list)
+    cicd_recommendations: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("cicd_recommendations", "ci_cd_recommendations"),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_bundle(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("deployment_plan"):
+                data["deployment_plan"] = (
+                    data.get("deployment_steps")
+                    or data.get("deployment_strategy")
+                    or data.get("deployment_runbook")
+                    or data.get("deployment")
+                    or []
+                )
+            if not data.get("cicd_recommendations") and not data.get("ci_cd_recommendations"):
+                data["cicd_recommendations"] = (
+                    data.get("ci_cd_pipeline")
+                    or data.get("cicd_pipeline")
+                    or data.get("pipeline")
+                    or data.get("ci_cd")
+                    or []
+                )
+            for key in ["deployment_plan", "cicd_recommendations", "ci_cd_recommendations"]:
+                data[key] = _as_string_list(data.get(key))
+        return data
 
 
 # --------------------------------------------------------------------------- #

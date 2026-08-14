@@ -7,19 +7,62 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Literal, TypedDict
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.utils.json import parse_partial_json
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
 from llm.langchain_client import LLM_PROVIDER, get_chat_model
 from llm.router import ModelConfig
+from services.evaluation import evaluate_agent_output
+from services.rag import format_retrieved_context, retrieve_for_agent
+from services.run_trace import record_step
 from tools.agent_tools import get_tools_for_agent
 from tools.project_context import select_project_context
 from utils.logging import get_logger
 
 logger = get_logger("workflows.agent_graph")
+
+
+class QualityGateError(RuntimeError):
+    """A schema-valid draft is still too incomplete to become project truth."""
+
+
+def _is_provider_throttle(exc: Exception) -> bool:
+    """Preserve provider throttles so the engine can honor retry windows."""
+    return getattr(exc, "status_code", None) == 429 or "rate limit" in type(exc).__name__.lower()
+
+
+def _extract_json_object(text: str) -> str | None:
+    """Return the first balanced JSON object, respecting strings and escapes."""
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+    return None
 
 
 class QualityReview(BaseModel):
@@ -31,6 +74,8 @@ class AgentGraphState(TypedDict, total=False):
     context: dict[str, Any]
     scoped_context: str
     prior_database_context: str
+    retrieved_context: str
+    retrieval_sources: list[dict[str, Any]]
     tool_insights: str
     user_prompt: str
     supervision_directive: str
@@ -76,7 +121,7 @@ def build_agent_graph(
         sys_messages.append(
             ("system", f"CRITICAL CEO SUPERVISOR DIRECTIVE (you MUST address this):\n{directive}")
         )
-    sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}\n\nResults from callable specialist tools:\n{tool_insights}"))
+    sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}\n\nRetrieved project evidence (cite these SOURCE ids in reasoning when relevant):\n{retrieved_context}\n\nResults from callable specialist tools:\n{tool_insights}"))
     sys_messages.append(("system", "Return only one valid JSON object matching the requested schema. Do not return a function/tool envelope, markdown, or commentary."))
 
     generation_prompt = ChatPromptTemplate.from_messages(
@@ -108,7 +153,7 @@ def build_agent_graph(
                 "system",
                 "Revise the candidate to resolve every quality issue while preserving correct, "
                 "specific content, domain consistency, and alignment with prior database decisions. "
-                "The response must satisfy the configured output schema.",
+                "Return one valid JSON object satisfying the configured output schema.",
             ),
             (
                 "human",
@@ -119,26 +164,68 @@ def build_agent_graph(
     )
 
     async def retrieve_context(state: AgentGraphState) -> dict[str, Any]:
+        started = time.monotonic()
         scoped = await select_project_context.ainvoke(
             {"agent_id": agent_id, "project_context": state["context"]}
         )
-
+        query = f"{state['user_prompt']}\n{scoped}"
+        chunks = await retrieve_for_agent(
+            str(state["context"].get("project_id", "")), agent_id, query, limit=5
+        )
+        sources = [
+            {
+                "citation": chunk.citation,
+                "title": chunk.source_title,
+                "score": round(chunk.score, 4),
+            }
+            for chunk in chunks
+        ]
+        await record_step(
+            state["context"].get("run_id"), agent_id, "retrieve", "complete",
+            input_context={"query": query[:1000]},
+            output={"sources": sources, "result_count": len(sources)},
+            started_at=started,
+        )
         return {
             "scoped_context": scoped,
+            "retrieved_context": format_retrieved_context(
+                chunks, max_chars=3000 if agent_id == "integration" else 4000
+            ),
+            "retrieval_sources": sources,
             "supervision_directive": directive or "",
         }
 
     async def generate(state: AgentGraphState) -> dict[str, Any]:
+        started = time.monotonic()
         try:
             draft = await (generation_prompt | generator).ainvoke(state)
         except Exception as exc:
             import re
             err_str = str(exc)
-            raw_json = None
+            raw_json = getattr(exc, "llm_output", None)
+            if not isinstance(raw_json, str):
+                raw_json = None
+            body = getattr(exc, "body", None)
+            if not raw_json and isinstance(body, dict):
+                failed = body.get("failed_generation")
+                if not failed and isinstance(body.get("error"), dict):
+                    failed = body["error"].get("failed_generation")
+                if isinstance(failed, str) and failed.strip():
+                    raw_json = _extract_json_object(failed) or failed
+
+            # LangChain may reject an otherwise recoverable JSON-mode response
+            # before our schema's normalizers run. Extract the exact balanced
+            # completion and validate it locally.
+            completion_marker = "from completion "
+            marker_index = err_str.lower().find(completion_marker)
+            if not raw_json and marker_index >= 0:
+                raw_json = _extract_json_object(
+                    err_str[marker_index + len(completion_marker):]
+                )
 
             # Pattern 1: <function=...>{...}</function>
             match = re.search(r"<function=[^>]+>\s*(\{.*\})\s*</function>", err_str, re.S)
-            if match:
+            if not raw_json and match:
                 raw_json = match.group(1)
 
             # Pattern 2: failed_generation: '...' or "..." or raw JSON object
@@ -164,15 +251,26 @@ def build_agent_graph(
 
             if raw_json:
                 try:
-                    parsed = json.loads(raw_json)
+                    try:
+                        parsed = json.loads(raw_json)
+                    except json.JSONDecodeError:
+                        parsed = parse_partial_json(raw_json)
                     if isinstance(parsed, dict) and "parameters" in parsed and isinstance(parsed["parameters"], dict):
                         parsed = parsed["parameters"]
                     draft = schema.model_validate(parsed)
-                    logger.warning("Agent %s recovered schema-valid output from rejected tool envelope", agent_id)
+                    logger.warning("Agent %s recovered and normalized rejected structured output", agent_id)
+                    await record_step(
+                        state["context"].get("run_id"), agent_id, "generate", "complete",
+                        output={"recovered": True, "schema": schema.__name__}, started_at=started,
+                    )
                     return {"draft": draft}
                 except Exception as parse_err:
-                    logger.debug("Failed to salvage rejected tool envelope: %s", parse_err)
+                    logger.warning("Agent %s local structured-output recovery failed: %s", agent_id, parse_err)
             raise exc
+        await record_step(
+            state["context"].get("run_id"), agent_id, "generate", "complete",
+            output={"recovered": False, "schema": schema.__name__}, started_at=started,
+        )
         return {"draft": draft}
 
     async def call_tools(state: AgentGraphState) -> dict[str, Any]:
@@ -181,7 +279,9 @@ def build_agent_graph(
         Consultation tools require a question and are represented by upstream agent state;
         domain/calculation tools are true LangChain tools invoked through their schemas.
         """
+        started = time.monotonic()
         results=[]
+        calls: list[dict[str, Any]] = []
         for specialist_tool in get_tools_for_agent(agent_id):
             if specialist_tool.name.startswith("consult_"):
                 continue
@@ -192,14 +292,38 @@ def build_agent_graph(
             try:
                 value=await specialist_tool.ainvoke({})
                 results.append(f"[{specialist_tool.name}]\n{value}")
+                calls.append({"tool": specialist_tool.name, "status": "complete"})
                 logger.info("Agent %s called tool %s",agent_id,specialist_tool.name)
             except Exception as exc:
+                calls.append({"tool": specialist_tool.name, "status": "failed", "error": str(exc)[:160]})
                 logger.warning("Agent %s tool %s unavailable: %s",agent_id,specialist_tool.name,str(exc)[:120])
-        return {"tool_insights":"\n\n".join(results) or "No external tool result was required."}
+        await record_step(
+            state["context"].get("run_id"), agent_id, "tools", "complete",
+            output={"calls": calls}, started_at=started,
+        )
+        return {"tool_insights":("\n\n".join(results)[:2500] or "No external tool result was required.")}
 
     async def review(state: AgentGraphState) -> dict[str, Any]:
+        started = time.monotonic()
+        deterministic_issues, metrics = evaluate_agent_output(
+            agent_id, state["draft"].model_dump(mode="json")
+        )
+        if deterministic_issues:
+            result = QualityReview(passed=False, issues=deterministic_issues)
+            await record_step(
+                state["context"].get("run_id"), agent_id, "quality_gate", "complete",
+                output={"passed": False, "issues": deterministic_issues, "metrics": metrics},
+                started_at=started,
+            )
+            return {"review": result}
         if os.getenv("LLM_QUALITY_REVIEW", "false").lower() not in {"1", "true", "yes"}:
-            return {"review": QualityReview(passed=True)}
+            result = QualityReview(passed=True)
+            await record_step(
+                state["context"].get("run_id"), agent_id, "quality_gate", "complete",
+                output={"passed": True, "issues": [], "metrics": metrics, "llm_review": False},
+                started_at=started,
+            )
+            return {"review": result}
         try:
             result = await (review_prompt | reviewer).ainvoke(
                 {
@@ -208,6 +332,11 @@ def build_agent_graph(
                 }
             )
             logger.info("Agent %s quality review: passed=%s", agent_id, result.passed)
+            await record_step(
+                state["context"].get("run_id"), agent_id, "quality_gate", "complete",
+                output={"passed": result.passed, "issues": result.issues, "metrics": metrics, "llm_review": True},
+                started_at=started,
+            )
             return {"review": result}
         except Exception as exc:
             # A reviewer outage must not discard an already schema-valid result.
@@ -218,6 +347,7 @@ def build_agent_graph(
         return "finish" if state["review"].passed else "refine"
 
     async def refine(state: AgentGraphState) -> dict[str, Any]:
+        started = time.monotonic()
         try:
             revised = await (refine_prompt | generator).ainvoke(
                 {
@@ -226,13 +356,28 @@ def build_agent_graph(
                     "issues": "\n".join(f"- {issue}" for issue in state["review"].issues),
                 }
             )
+            issues, metrics = evaluate_agent_output(agent_id, revised.model_dump(mode="json"))
+            await record_step(
+                state["context"].get("run_id"), agent_id, "refine", "complete",
+                output={"remaining_issues": issues, "metrics": metrics}, started_at=started,
+            )
+            if issues:
+                raise QualityGateError(
+                    f"{agent_id} refinement still failed quality gates: {'; '.join(issues)}"
+                )
             return {"result": revised}
+        except QualityGateError:
+            raise
         except Exception as exc:
+            if _is_provider_throttle(exc):
+                raise
             logger.warning(
-                "Agent %s refine step failed (%s), safely using initial valid draft",
+                "Agent %s refine step failed (%s); rejecting incomplete draft",
                 agent_id, str(exc)[:200],
             )
-            return {"result": state["draft"]}
+            raise QualityGateError(
+                f"{agent_id} quality refinement unavailable; draft rejected"
+            ) from exc
 
     async def finish(state: AgentGraphState) -> dict[str, Any]:
         return {"result": state["draft"]}

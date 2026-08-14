@@ -1,0 +1,18 @@
+# Production hardening overlay. Supply TLS/routing at the platform ingress and
+# inject real secrets through the deployment environment or secret manager.
+services:
+  frontend:
+    environment:
+      NEXT_PUBLIC_BYPASS_AUTH: "false"
+      NEXT_PUBLIC_UNLIMITED_CREDENTIALS: "false"
+
+  backend:
+    environment:
+      BYPASS_AUTH: "false"
+      UNLIMITED_CREDENTIALS: "false"
+
+  ai-services:
+    # The browser must never reach the AI control plane directly.
+    ports: !reset []
+    expose:
+      - "8001"

@@ -9,13 +9,14 @@ The AI Services microservice handles the execution of autonomous agents and plan
 - **Framework**: FastAPI (Python 3.12-slim base image) running on Port **8001**
 - **ASGI Server**: Uvicorn
 - **AI Tooling Frameworks**: LangChain 1.x and LangGraph 1.x
-- **Caching & Broker**: Redis
+- **Retrieval & Memory**: PostgreSQL/pgvector hybrid retrieval and durable agent memories
+- **Provenance**: Agent runs and phase-level retrieval/tool/quality traces
 
 ## How generation works
 
 There are two orchestration levels. `workflows/engine.py` is the outer business
-workflow. It preserves the product-planning dependency order and emits Redis
-events consumed by the UI:
+workflow. It preserves the product-planning dependency order and emits streamed
+events persisted by the backend:
 
 ```text
 CEO
@@ -40,6 +41,12 @@ START
 retrieve_context (LangChain tool)
   │
   ▼
+hybrid RAG (project sources + memories)
+  │
+  ▼
+specialist tools
+  │
+  ▼
 generate (role prompt + Pydantic structured output)
   │
   ▼
@@ -57,7 +64,11 @@ architect receives the original idea, executive summary, and complete
 requirements; the timeline agent receives the executive estimate, architecture,
 backlog, and team. Large presentation-only fields such as Mermaid and diagram
 coordinates are removed. This provides substantially more grounding than the
-older prompt-only summaries while avoiding irrelevant context.
+older prompt-only summaries while avoiding irrelevant context. In addition,
+`services/rag.py` runs a role-specific hybrid pgvector/full-text query over
+uploaded sources, prior validated output, and distilled decisions. The SQL
+always constrains both workspace and project, and every result has a stable
+source citation recorded in `agent_run_steps`.
 
 The existing compact summaries in `prompts/context.py` remain in the human
 instruction. They emphasize the most important facts; the scoped JSON is the
@@ -114,8 +125,8 @@ The internal module structure isolates agent design patterns:
 ai-services/
 ├── agents/             # Specialized AI Agent implementations (e.g. Risk AI, Cost Estimator)
 ├── llm/                # LangChain/OpenAI-compatible client and model routing
-├── memory/             # Reserved for future persisted conversation state
-├── services/           # Helper business services for API endpoints
+├── memory/             # Durable project/agent context and versioned output access
+├── services/           # RAG, embeddings, evaluation, provenance, and helpers
 ├── tools/              # LangChain tools for scoped project-context retrieval
 ├── utils/              # Helper utilities (text parsers, cleanups)
 ├── workflows/          # Workflow definitions (Agent graphs and orchestrators)
@@ -142,6 +153,7 @@ To help test and monitor agent APIs, this service runs a FastAPI endpoint on por
   "uptime_seconds": 150.2,
   "dependencies": {
     "database": "healthy",
+    "rag": "healthy",
     "llm": "healthy (Groq Cloud - llama-3.3-70b-versatile)"
   }
 }
@@ -188,4 +200,3 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 The server will begin listening on `http://localhost:8001`. You can access the Swagger UI at `http://localhost:8001/docs`.
-

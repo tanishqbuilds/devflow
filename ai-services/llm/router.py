@@ -20,6 +20,7 @@ logger = get_logger("llm.router")
 DEFAULT_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 SMART_MODEL = os.getenv("LLM_MODEL_SMART", DEFAULT_MODEL)
 FAST_MODEL = os.getenv("LLM_MODEL_FAST", "llama-3.1-8b-instant")
+SECONDARY_MODEL = os.getenv("LLM_MODEL_SECONDARY", "allam-2-7b")
 
 
 @dataclass(frozen=True)
@@ -34,10 +35,10 @@ _PROFILES: dict[str, ModelConfig] = {
     "product_manager": ModelConfig(SMART_MODEL, 0.4, 2600),
     "architect": ModelConfig(SMART_MODEL, 0.35, 2200),
     "sprint_planner": ModelConfig(FAST_MODEL, 0.3, 2600),
-    "risk": ModelConfig(FAST_MODEL, 0.4, 1200),
+    "risk": ModelConfig(SMART_MODEL, 0.35, 2600),
     "team_allocation": ModelConfig(FAST_MODEL, 0.4, 1000),
     "timeline": ModelConfig(SMART_MODEL, 0.35, 1200),
-    "integration": ModelConfig(FAST_MODEL, 0.4, 1000),
+    "integration": ModelConfig(SMART_MODEL, 0.35, 2200),
     "ceo_review": ModelConfig(SMART_MODEL, 0.2, 700),
 }
 
@@ -52,4 +53,4 @@ def resolve(agent_id: str) -> ModelConfig:
 
 
 def all_models() -> set[str]:
-    return {resolve(a).model for a in _PROFILES}
+    return {resolve(a).model for a in _PROFILES} | {FAST_MODEL, SECONDARY_MODEL}

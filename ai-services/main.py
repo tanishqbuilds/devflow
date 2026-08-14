@@ -67,18 +67,28 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"database": "unknown", "llm": "unknown"}
+    dependencies = {"database": "unknown", "rag": "unknown", "llm": "unknown"}
 
     try:
         pool = await get_db_pool()
         if pool:
             async with pool.acquire() as conn:
                 await conn.fetchval("SELECT 1")
+                vector_ready = await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"
+                )
+                chunks_ready = await conn.fetchval(
+                    """SELECT EXISTS(SELECT 1 FROM information_schema.tables
+                       WHERE table_schema='public' AND table_name='knowledge_chunks')"""
+                )
             dependencies["database"] = "healthy"
+            dependencies["rag"] = "healthy" if vector_ready and chunks_ready else "unhealthy: RAG schema missing"
         else:
             dependencies["database"] = "unhealthy: database pool unavailable"
+            dependencies["rag"] = "unhealthy: database pool unavailable"
     except Exception as e:
         dependencies["database"] = f"unhealthy: {str(e)}"
+        dependencies["rag"] = f"unhealthy: {str(e)}"
 
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")

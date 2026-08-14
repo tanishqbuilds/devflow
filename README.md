@@ -12,8 +12,8 @@ Devflow is an autonomous AI software architecture and delivery planning platform
                     │  backend (FastAPI) — orchestration layer         │  :8000
                     │  • POST /projects/analyze  GET /projects/:id     │
                     │  • WS  /projects/:id/stream                      │
-                    │  • In-memory job queue + event bus + buffer      │
-                    │  • Supabase (PostgreSQL) persistence             │
+                    │  • Durable job queue + replayable event stream   │
+                    │  • Supabase PostgreSQL + pgvector hybrid RAG     │
                     └────────┬────────────────────────────────┬────────┘
                              │ HTTP Stream (SSE / NDJSON)     │ SSL Connection Pool
                     ┌────────▼──────────────┐         ┌───────▼──────────────┐
@@ -183,4 +183,7 @@ CEO ─▶ Product Manager ─▶ System Architect ─┬▶ Sprint Planner ─�
 
 - **Database**: Connects directly to **Supabase** (or any PostgreSQL instance) using async connection pooling (`asyncpg`) with automatic SSL. Database tables and indexes are initialized automatically on startup.
 - **Authentication**: Powered by **Clerk**. Set `BYPASS_AUTH=true` in `.env` for local testing without authentication, or provide `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for multi-user authentication.
-- **Event Streaming**: Uses an in-memory async event broker with WebSocket streaming and late-joiner replay buffer — no Redis or external broker installation needed.
+- **RAG & Memory**: Project sources, prior validated outputs, and distilled decisions are indexed with pgvector plus PostgreSQL full-text search. Every retrieval is scoped by workspace and project and recorded in the agent run trace.
+- **Event Streaming**: Uses PostgreSQL-backed jobs and append-only events with WebSocket replay, so multiple API replicas can safely claim work and serve live clients without Redis.
+
+The rationale, schema review, and production checklist are documented in [docs/saas-rag-orchestration.md](docs/saas-rag-orchestration.md).

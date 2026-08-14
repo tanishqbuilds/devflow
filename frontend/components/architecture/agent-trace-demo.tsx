@@ -27,7 +27,7 @@ const traces: Trace[] = [
   {
     id: 'architect', name: 'System Architect', section: 'architecture', schema: 'ArchitectureBundle',
     context: ['idea', 'executive_summary (summary)', 'requirements (summary)'], processor: 'build_diagram() + build_mermaid()',
-    output: { frontend: { summary: 'Web application', components: ['Landing', 'Workspace'], technologies: ['Next.js'], decisions: ['Server/client component split'] }, backend: { summary: 'API and orchestration', components: ['FastAPI API', 'Worker'], technologies: ['FastAPI'], decisions: ['Async event flow'] }, database: { summary: 'Durable tenant data', components: ['Users', 'Projects'], technologies: ['PostgreSQL'], decisions: ['JSONB project document'] }, infrastructure: { summary: 'Container runtime', components: ['Application containers', 'Redis'], technologies: ['Docker'], decisions: ['Service separation'] }, technology_recommendations: ['Use typed contracts', 'Keep AI workers isolated'], scalability_plan: ['Add workers', 'Pool database connections'], integration_points: ['Clerk', 'LLM provider'] },
+    output: { frontend: { summary: 'Web application', components: ['Landing', 'Workspace'], technologies: ['Next.js'], decisions: ['Server/client component split'] }, backend: { summary: 'API and orchestration', components: ['FastAPI API', 'Worker'], technologies: ['FastAPI'], decisions: ['Async event flow'] }, database: { summary: 'Durable tenant data', components: ['Users', 'Projects', 'Knowledge chunks'], technologies: ['PostgreSQL', 'pgvector'], decisions: ['JSONB project read model', 'Hybrid retrieval'] }, infrastructure: { summary: 'Container runtime', components: ['Application containers', 'Managed PostgreSQL'], technologies: ['Docker'], decisions: ['Service separation'] }, technology_recommendations: ['Use typed contracts', 'Keep AI workers isolated'], scalability_plan: ['Add workers', 'Pool database connections'], integration_points: ['Clerk', 'LLM provider'] },
   },
   {
     id: 'sprint_planner', name: 'Sprint Planner', section: 'backlog', schema: 'SprintPlan',
@@ -52,7 +52,7 @@ const traces: Trace[] = [
   {
     id: 'integration', name: 'Integration', section: 'integrations', schema: 'IntegrationBundle',
     context: ['idea', 'executive_summary (summary)', 'architecture (summary)'], processor: 'No post-processor',
-    output: { integrations: [{ name: 'GitHub', category: 'github', purpose: 'Source and issue tracking', steps: ['Create an OAuth app'] }, { name: 'Calendar', category: 'calendar', purpose: 'Milestone scheduling', steps: ['Configure calendar API credentials'] }], deployment_plan: ['Build service containers', 'Deploy with managed PostgreSQL and Redis'], cicd_recommendations: ['Run tests and schema checks before deployment'] },
+    output: { integrations: [{ name: 'GitHub', category: 'github', purpose: 'Source and issue tracking', steps: ['Create an OAuth app'] }, { name: 'Calendar', category: 'calendar', purpose: 'Milestone scheduling', steps: ['Configure calendar API credentials'] }], deployment_plan: ['Build service containers', 'Deploy with managed PostgreSQL and pgvector'], cicd_recommendations: ['Run tests and schema checks before deployment'] },
   },
 ]
 
@@ -91,8 +91,8 @@ export function AgentTraceDemo() {
             <p className="mt-3 font-mono text-xs text-violet-200">{trace.processor}</p>
           </article>
           <article className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <div className="flex items-center gap-2"><Radio className="h-4 w-4 text-amber-300" /><h3 className="font-semibold">4. Redis transport</h3></div>
-            <p className="mt-3 text-xs leading-5 text-slate-400">Published on <code>events:proj_demo_01</code>, then appended to <code>events:proj_demo_01:buffer</code> by the backend worker.</p>
+            <div className="flex items-center gap-2"><Radio className="h-4 w-4 text-amber-300" /><h3 className="font-semibold">4. HTTP event stream</h3></div>
+            <p className="mt-3 text-xs leading-5 text-slate-400">Emitted as newline-delimited JSON to the backend, appended to the durable job event log, then replayed by any WebSocket-serving API replica.</p>
           </article>
           <article className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-5">
             <div className="flex items-center gap-2"><Database className="h-4 w-4 text-emerald-300" /><h3 className="font-semibold">5. PostgreSQL writes</h3></div>
@@ -107,7 +107,7 @@ export function AgentTraceDemo() {
           </article>
           <div className="flex items-center justify-center gap-3 text-xs text-slate-500"><span>validated data</span><ArrowRight className="h-4 w-4" /><span>event envelope</span></div>
           <details className="group rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <summary className="cursor-pointer text-sm font-semibold text-white">Inspect the Redis <code>section_complete</code> event</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-white">Inspect the streamed <code>section_complete</code> event</summary>
             <div className="mt-4"><JsonBlock value={event} /></div>
           </details>
         </div>

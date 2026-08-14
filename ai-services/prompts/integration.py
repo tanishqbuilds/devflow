@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from prompts.context import build_base_context
-
 SYSTEM_PROMPT = (
     "You are a Platform/DevOps architect planning the product's integrations and delivery pipeline.\n\n"
     "Recommend third-party integrations needed (always consider GitHub for version control & issue tracking, "
@@ -21,10 +19,8 @@ SYSTEM_PROMPT = (
 
 
 def build_user_prompt(ctx: dict[str, Any]) -> str:
-    context = build_base_context(ctx, include=["executive", "architecture"])
     return (
         f"Founder's idea:\n\"{ctx.get('idea', '')}\"\n\n"
-        f"{context}\n\n"
-        "Produce 3-6 integrations (with auth_method, purpose, steps, and rollback_steps), "
+        "Produce 3-5 concise integrations (with auth_method, purpose, steps, and rollback_steps), "
         "a deployment plan, and CI/CD recommendations that match the architecture's infrastructure layer."
     )

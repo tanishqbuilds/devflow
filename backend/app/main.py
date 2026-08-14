@@ -80,13 +80,25 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check():
-    dependencies = {"database": "unknown", "ai_services": "unknown"}
+    dependencies = {"database": "unknown", "rag_index": "unknown", "ai_services": "unknown"}
     try:
         async with pool().acquire() as conn:
             await conn.fetchval("SELECT 1")
         dependencies["database"] = "healthy"
+        async with pool().acquire() as conn:
+            vector_ready = await conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"
+            )
+            rag_tables = await conn.fetchval(
+                """SELECT count(*)=6 FROM information_schema.tables
+                   WHERE table_schema='public' AND table_name IN
+                     ('project_documents','knowledge_chunks','project_memories',
+                      'agent_runs','orchestration_jobs','orchestration_events')"""
+            )
+        dependencies["rag_index"] = "healthy" if vector_ready and rag_tables else "unhealthy: RAG schema missing"
     except Exception as e:
         dependencies["database"] = f"unhealthy: {str(e)}"
+        dependencies["rag_index"] = f"unhealthy: {str(e)}"
 
     try:
         ai_health = await ai_services.health()

@@ -16,8 +16,8 @@ const stages = [
   { n: '01', title: 'Vision', agents: ['CEO Agent'], output: 'Executive summary', tone: 'cyan' },
   { n: '02', title: 'Product', agents: ['Product Manager'], output: 'Requirements', tone: 'sky' },
   { n: '03', title: 'Design', agents: ['System Architect'], output: 'Architecture + diagram', tone: 'violet' },
-  { n: '04', title: 'Plan in parallel', agents: ['Sprint Planner', 'Risk Analyst', 'Team Allocation'], output: 'Backlog · risks · team · cost', tone: 'fuchsia' },
-  { n: '05', title: 'Deliver in parallel', agents: ['Timeline Agent', 'Integration Agent'], output: 'Roadmap · integrations', tone: 'emerald' },
+  { n: '04', title: 'Delivery planning', agents: ['Sprint Planner', 'Risk Analyst', 'Team Allocation'], output: 'Backlog · risks · team · cost', tone: 'fuchsia' },
+  { n: '05', title: 'Release planning', agents: ['Timeline Agent', 'Integration Agent'], output: 'Roadmap · integrations', tone: 'emerald' },
 ]
 
 const agents = [
@@ -64,14 +64,14 @@ export default function ArchitecturePage() {
           <div className="mb-5 flex flex-wrap gap-2"><Badge>8 specialized agents</Badge><Badge>5 execution stages</Badge><Badge>Schema-validated output</Badge></div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">A custom AI organization,<br /><span className="bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-400 bg-clip-text text-transparent">not a generic agent chain.</span></h1>
           <p className="mt-6 max-w-3xl text-base leading-8 text-slate-400 sm:text-lg">
-            This map is derived from the executable backend and AI-services code—not from the frontend presentation. Devflow does not currently use LangChain or LangGraph. It runs a fixed asynchronous Python workflow that passes accumulated project context through role-specific prompts, validates agent output with Pydantic, and publishes progress through Redis.
+            This map is derived from the executable backend and AI-services code—not from the frontend presentation. Devflow runs a fixed staged workflow built with LangChain and LangGraph, passes accumulated project context through role-specific prompts and tools, validates agent output with Pydantic, and streams progress directly to the backend over HTTP.
           </p>
         </header>
 
         <section>
           <div className="mb-8 flex items-end justify-between gap-4">
-            <div><p className="text-xs font-semibold uppercase tracking-[.25em] text-cyan-400">Execution graph</p><h2 className="mt-2 text-2xl font-semibold">Five stages, controlled parallelism</h2></div>
-            <p className="hidden max-w-md text-right text-sm text-slate-500 md:block">Stages are sequential. Agents inside stages 4 and 5 execute concurrently with <code className="text-slate-300">asyncio.gather</code>.</p>
+            <div><p className="text-xs font-semibold uppercase tracking-[.25em] text-cyan-400">Execution graph</p><h2 className="mt-2 text-2xl font-semibold">Five stages, rate-limit-aware scheduling</h2></div>
+            <p className="hidden max-w-md text-right text-sm text-slate-500 md:block">Stages are sequential. Peer agents use bounded concurrency and run one at a time on Groq by default so retries do not collide with the provider TPM window.</p>
           </div>
           <div className="grid gap-3 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1.35fr_auto_1.2fr] xl:items-stretch">
             {stages.map((stage, i) => (
@@ -126,12 +126,12 @@ export default function ArchitecturePage() {
             <article className="rounded-2xl border border-violet-400/20 bg-violet-400/[0.04] p-5">
               <Wrench className="h-5 w-5 text-violet-300" />
               <h3 className="mt-4 font-semibold text-white">Tool boundary</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Agents have no callable tools and cannot browse, query PostgreSQL, or search Redis. Diagram/Mermaid and cost generation are trusted Python post-processors run by the workflow engine.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Role-specific deterministic tools enrich model output with market, prioritization, sizing, security, staffing, schedule, and DevOps data. Diagram/Mermaid and cost generation remain trusted Python post-processors.</p>
             </article>
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-5 text-sm leading-6 text-slate-400">
-            <span className="font-semibold text-white">Parallel-context rule:</span> Stage 4 agents start from the same completed Stage 3 context. Although Team Allocation’s prompt builder supports a backlog summary, the Sprint Planner runs beside it, so that backlog is not available to Team Allocation in this graph. Stage 5 starts only after Stage 4 finishes, allowing Timeline to consume the backlog.
+            <span className="font-semibold text-white">Stage-context rule:</span> Every stage starts after its prerequisite stage finishes. With Groq’s default serialized peer scheduling, later peers can also see sections completed earlier in the same stage; other providers may raise the configured concurrency when their rate limits allow it.
           </div>
         </section>
 
@@ -139,12 +139,12 @@ export default function ArchitecturePage() {
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
             <p className="text-xs font-semibold uppercase tracking-[.2em] text-emerald-400">Project assistant</p>
             <h2 className="mt-3 text-xl font-semibold">Grounded chat, separate from the graph</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-400">Chat receives a compact briefing built from the stored project: idea, executive summary, requirements, architecture, backlog, risks, team, cost, timeline, and integrations when available. It also receives only the latest six conversation turns, truncated per turn.</p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">Chat receives a compact project briefing plus a project-scoped hybrid retrieval over uploaded sources, validated outputs, and durable decisions. Retrieved claims carry stable source citations; only the latest six bounded conversation turns are included.</p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
             <p className="text-xs font-semibold uppercase tracking-[.2em] text-violet-400">Prompt assembly</p>
             <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-slate-300">
-              {['Role system prompt', 'Selected context summaries', 'Original idea', 'Target JSON Schema', 'Model profile', 'Validated JSON'].map((item, i) => (
+              {['Role prompt', 'Scoped dependencies', 'Hybrid RAG evidence', 'Specialist tools', 'Target JSON Schema', 'Validated JSON'].map((item, i) => (
                 <div key={item} className="contents"><span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">{item}</span>{i < 5 && <ArrowRight className="h-3.5 w-3.5 text-slate-600" />}</div>
               ))}
             </div>
@@ -160,11 +160,11 @@ export default function ArchitecturePage() {
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {[
                 [LockKeyhole, '1. Authenticate', 'Clerk token is verified; the user is upserted in PostgreSQL.'],
-                [Database, '2. Create project', 'FastAPI writes the user-owned project and queues its ID in Redis.'],
-                [Zap, '3. Dispatch workflow', 'A backend worker pops the job, subscribes first, then asks AI Services to start a background run.'],
-                [Bot, '4. Run fixed graph', 'Each agent receives the accumulated context and returns Pydantic-validated structured data.'],
-                [Radio, '5. Publish events', 'AI Services publishes sequenced node, log, progress, section, error, and completion events.'],
-                [CheckCircle2, '6. Apply + relay', 'The backend buffers events, applies generated sections to PostgreSQL, and serves snapshot, replay, and live WebSocket data.'],
+                [Database, '2. Create project', 'FastAPI writes a workspace-owned project and a durable PostgreSQL orchestration job.'],
+                [Zap, '3. Dispatch workflow', 'A backend worker dequeues the job and opens a streaming HTTP request to AI Services.'],
+                [Bot, '4. Retrieve + run graph', 'Each specialist retrieves tenant-scoped sources and memories, calls dedicated tools, and returns Pydantic-validated data.'],
+                [Radio, '5. Stream events', 'AI Services emits newline-delimited node, log, progress, section, error, and completion events.'],
+                [CheckCircle2, '6. Apply + replay', 'The backend appends events and sections to PostgreSQL; any API replica can replay them to WebSocket clients.'],
               ].map(([Icon, title, body]) => {
                 const C = Icon as typeof Bot
                 return <article key={String(title)} className="rounded-xl border border-white/5 bg-black/20 p-4"><C className="h-4 w-4 text-cyan-400" /><h3 className="mt-3 text-sm font-medium text-white">{String(title)}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{String(body)}</p></article>
@@ -194,17 +194,17 @@ export default function ArchitecturePage() {
             <div className="mt-8 space-y-3">
               {[
                 ['FastAPI API', 'Clerk JWT verification · user upsert · ownership checks · project and chat routes'],
-                ['Orchestrator worker', 'BRPOP analysis queue · pre-subscribe · event consumption · run timeout'],
-                ['AI Services', 'Background WorkflowEngine task · agent registry · prompts · schemas · assistant'],
-                ['Redis', 'Analysis queue · events:{project_id} pub/sub · capped replay list with TTL'],
-                ['PostgreSQL', 'Users · user-owned project JSONB · generated-section and chat response rows'],
+                ['Orchestrator worker', 'PostgreSQL SKIP LOCKED queue · worker leases · streamed consumption · reconnects'],
+                ['AI Services', 'Streaming WorkflowEngine task · LangGraph agents · prompts · tools · schemas · assistant'],
+                ['RAG and event store', 'pgvector + full-text retrieval · durable memories · append-only job event replay'],
+                ['PostgreSQL', 'Workspace tenancy · project JSONB · sources/chunks · agent runs/steps · revisions'],
                 ['LLM client', 'AsyncOpenAI-compatible client · Groq, Ollama, or generic endpoint · per-agent model profiles'],
               ].map(([name, detail], i) => <div key={name} className="flex items-center gap-4 rounded-xl border border-white/5 bg-black/20 p-4"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-400/10 font-mono text-xs text-emerald-400">{i + 1}</span><div><h3 className="text-sm font-medium text-white">{name}</h3><p className="mt-1 text-xs text-slate-500">{detail}</p></div><ChevronRight className="ml-auto h-4 w-4 text-slate-700" /></div>)}
             </div>
           </div>
           <div className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6"><div className="flex items-center gap-3"><RefreshCw className="h-5 w-5 text-amber-400" /><h2 className="font-semibold">Failure behavior</h2></div><p className="mt-4 text-sm leading-6 text-slate-400">Provider and schema-validation failures are attempted up to three times; validation retries include the exact Pydantic error. An exhausted agent emits an error and the remaining graph continues. A backend run timeout marks the project failed. The replay list is capped at 2,000 events and expires after the configured TTL (24 hours by default).</p></div>
-            <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-cyan-400" /><h2 className="font-semibold">Data boundaries</h2></div><p className="mt-4 text-sm leading-6 text-slate-400">User-facing project REST and WebSocket access is scoped to the verified Clerk user ID. Internal workers resolve trusted project IDs dequeued from Redis. Projects belong to users; AI-response rows belong to both a user and project, with cascading foreign keys.</p></div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6"><div className="flex items-center gap-3"><RefreshCw className="h-5 w-5 text-amber-400" /><h2 className="font-semibold">Failure behavior</h2></div><p className="mt-4 text-sm leading-6 text-slate-400">Provider and schema retries have separate budgets. Minute limits honor reset hints, daily quotas fail fast, and incomplete sections remain checkpointed. Worker leases recover abandoned jobs; PostgreSQL retains the current event stream for replica-safe replay.</p></div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-cyan-400" /><h2 className="font-semibold">Data boundaries</h2></div><p className="mt-4 text-sm leading-6 text-slate-400">REST and WebSocket access requires a verified Clerk user and workspace membership. Retrieval SQL filters both workspace_id and project_id. Sources, chunks, memories, runs, events, and generated responses cascade from their owning tenant/project.</p></div>
             <div className="rounded-3xl border border-violet-400/20 bg-violet-400/[0.05] p-6"><div className="flex items-center gap-3"><Sparkles className="h-5 w-5 text-violet-300" /><h2 className="font-semibold">Derived artifacts</h2></div><p className="mt-4 text-sm leading-6 text-slate-400">Architecture diagrams and Mermaid source are derived after the architect agent. Cost is computed deterministically from the team plan, duration, and complexity—not generated as a separate LLM guess.</p></div>
           </div>
         </section>

@@ -24,6 +24,27 @@ logger = get_logger("workflows.supervisor")
 MAX_SUPERVISION_ROUNDS = int(os.getenv("MAX_SUPERVISION_ROUNDS", "2"))
 ENABLE_SUPERVISION = os.getenv("ENABLE_CEO_SUPERVISION", "true").lower() in ("1", "true", "yes")
 
+# Structured-output models occasionally return the reviewed section name instead
+# of the registry's agent ID. Keep the public schema forgiving, but resolve those
+# predictable aliases before dispatching a potentially expensive re-run.
+_AGENT_ID_ALIASES = {
+    "executive_summary": "ceo",
+    "requirements": "product_manager",
+    "architecture": "architect",
+    "backlog": "sprint_planner",
+    "tasks": "sprint_planner",
+    "risks": "risk",
+    "team": "team_allocation",
+    "cost": "team_allocation",
+    "timeline": "timeline",
+    "integrations": "integration",
+}
+
+
+def _resolve_agent_id(value: str) -> str:
+    normalized = value.lower().strip().replace("-", "_").replace(" ", "_")
+    return _AGENT_ID_ALIASES.get(normalized, normalized)
+
 
 class CEOSupervisor:
     """Orchestrates outer quality evaluation and targeted re-runs across all agents."""
@@ -99,7 +120,7 @@ class CEOSupervisor:
             # Process directives and re-run flagged agents
             directives_to_run = review.directives[:3]  # Cap at 3 agents per round for token budget
             for directive in directives_to_run:
-                target_agent = directive.agent_id.lower().strip()
+                target_agent = _resolve_agent_id(directive.agent_id)
                 reason = directive.reason
                 logger.info("⚡ CEO Directive: Re-running agent '%s' (reason: %s)", target_agent, reason[:100])
                 await self._emitter.supervisor_directive(target_agent, reason, self._round)
