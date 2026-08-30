@@ -148,9 +148,9 @@ async def _resolve_user_id(conn: Any, project_id: str, fallback_user_id: str = "
         if row and row["user_id"]:
             return row["user_id"]
         # Fallback to first user in users table
-        user_row = await conn.fetchrow("SELECT id FROM users LIMIT 1")
+        user_row = await conn.fetchrow("SELECT clerk_user_id FROM users LIMIT 1")
         if user_row:
-            return user_row["id"]
+            return user_row["clerk_user_id"]
     except Exception:
         pass
     return fallback_user_id

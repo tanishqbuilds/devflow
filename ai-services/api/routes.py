@@ -10,17 +10,18 @@ import asyncio
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agents.registry import AGENTS, get_agent
+from api.auth import require_internal_auth
 from services.assistant import chat as assistant_chat
 from utils.logging import get_logger
 from workflows.engine import WorkflowEngine
 
 logger = get_logger("api")
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_auth)])
 
 # Keep references to background workflow tasks so they aren't garbage-collected.
 _BACKGROUND_TASKS: set[asyncio.Task] = set()

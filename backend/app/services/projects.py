@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import uuid
 from typing import Any, Optional
 
 from app.core.logging import get_logger
@@ -10,6 +12,7 @@ from app.models.project import new_project_doc
 
 logger = get_logger("services.projects")
 _MAX_LOGS = 250
+_UNSET = object()
 
 
 def _now() -> str:
@@ -63,18 +66,25 @@ async def _save_doc(project_id: str, doc: dict[str, Any]) -> None:
 
 
 async def set_status(
-    project_id: str, status: str, *, progress: Optional[int] = None, error: Optional[str] = None
+    project_id: str,
+    status: str,
+    *,
+    progress: Optional[int] = None,
+    error: Optional[str] | object = _UNSET,
 ) -> None:
-    doc = await get_project(project_id)
-    if not doc:
-        return
-    doc["status"] = status
-    doc["updated_at"] = _now()
+    now = _now()
+    patch: dict[str, Any] = {"status": status, "updated_at": now}
     if progress is not None:
-        doc["progress"] = progress
-    if error is not None:
-        doc["error"] = error
-    await _save_doc(project_id, doc)
+        patch["progress"] = progress
+    if error is not _UNSET:
+        patch["error"] = error
+    await execute(
+        """UPDATE projects
+           SET status=$2, progress=COALESCE($3, progress), document=document || $4,
+               updated_at=NOW()
+           WHERE id=$1""",
+        project_id, status, progress, patch,
+    )
 
 
 async def update_section(project_id: str, section: str, data: Any) -> bool:
@@ -196,7 +206,112 @@ async def add_ai_response(
     )
 
 
+async def create_source_document(
+    project_id: str,
+    user_id: str,
+    *,
+    title: str,
+    content: str,
+    source_type: str,
+    mime_type: str,
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist a tenant-scoped source for the AI retrieval pipeline."""
+    role = await project_role(project_id, user_id)
+    if role not in {"owner", "admin", "editor"}:
+        raise PermissionError("document upload requires edit permission")
+    doc = await get_project(project_id, user_id)
+    if not doc:
+        raise LookupError("project not found")
+    workspace_id = await ensure_project_workspace(project_id, doc)
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    document_id = uuid.uuid4().hex
+    row = await fetchrow(
+        """INSERT INTO project_documents
+               (id, workspace_id, project_id, created_by, title, source_type,
+                mime_type, content, content_sha256, metadata)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           ON CONFLICT (project_id, content_sha256) DO UPDATE
+               SET title=EXCLUDED.title, source_type=EXCLUDED.source_type,
+                   mime_type=EXCLUDED.mime_type, metadata=EXCLUDED.metadata,
+                   status='pending', updated_at=NOW()
+           RETURNING id, project_id, title, source_type, mime_type, metadata,
+                     status, created_at, updated_at""",
+        document_id, workspace_id, project_id, user_id, title, source_type,
+        mime_type, content, digest, metadata,
+    )
+    return dict(row) if row else {}
+
+
+async def list_source_documents(project_id: str, user_id: str) -> list[dict[str, Any]]:
+    if not await project_role(project_id, user_id):
+        raise LookupError("project not found")
+    rows = await fetch(
+        """SELECT id, project_id, title, source_type, mime_type, metadata,
+                  status, length(content) AS content_length, created_at, updated_at
+           FROM project_documents WHERE project_id=$1 ORDER BY created_at DESC""",
+        project_id,
+    )
+    return [dict(row) for row in rows]
+
+
+async def ai_provenance(project_id: str, user_id: str) -> dict[str, Any]:
+    """Return tenant-authorized RAG and agent-run evidence without raw source text."""
+    if not await project_role(project_id, user_id):
+        raise LookupError("project not found")
+    run_rows = await fetch(
+        """SELECT r.id, r.trigger, r.status, r.output_summary, r.metrics, r.error,
+                  r.started_at, r.completed_at, count(s.id)::int AS step_count
+           FROM agent_runs r LEFT JOIN agent_run_steps s ON s.run_id=r.id
+           WHERE r.project_id=$1
+           GROUP BY r.id ORDER BY r.started_at DESC LIMIT 20""",
+        project_id,
+    )
+    source_rows = await fetch(
+        """SELECT source_kind, source_key, source_title, count(*)::int AS chunks,
+                  max(updated_at) AS indexed_at
+           FROM knowledge_chunks WHERE project_id=$1
+           GROUP BY source_kind, source_key, source_title
+           ORDER BY source_kind, source_title""",
+        project_id,
+    )
+    memory_rows = await fetch(
+        """SELECT agent_id, memory_type, content, importance, metadata, created_at
+           FROM project_memories
+           WHERE project_id=$1 AND superseded_at IS NULL
+           ORDER BY importance DESC, created_at DESC LIMIT 100""",
+        project_id,
+    )
+    return {
+        "runs": [dict(row) for row in run_rows],
+        "indexed_sources": [dict(row) for row in source_rows],
+        "memories": [dict(row) for row in memory_rows],
+    }
+
+
 async def apply_event(project_id: str, event: dict[str, Any]) -> None:
+    # Section delivery is the hot path. Persist the project document and its
+    # response-history row in one database round trip; the previous read + two
+    # writes made a streamed run lag minutes behind when using a cloud database.
+    if event.get("type") == "section_complete" and event.get("section"):
+        section = str(event["section"])
+        data = event.get("data")
+        now = _now()
+        await execute(
+            """WITH updated AS (
+                   UPDATE projects
+                   SET document=jsonb_set(document, ARRAY[$2]::text[], $3::jsonb, true)
+                                || jsonb_build_object('updated_at', $4::text),
+                       updated_at=NOW()
+                   WHERE id=$1
+                   RETURNING user_id
+               )
+               INSERT INTO ai_responses (project_id, user_id, kind, role, payload)
+               SELECT $1, user_id, $5, 'assistant', $3::jsonb FROM updated""",
+            project_id, section, data, now, f"section:{section}",
+        )
+        return
+
     doc = await get_project(project_id)
     if not doc:
         return
@@ -213,12 +328,6 @@ async def apply_event(project_id: str, event: dict[str, Any]) -> None:
             "agent": event.get("agent"), "level": event.get("level", "info"),
             "message": event.get("message", ""), "ts": event.get("ts"),
         }])[-_MAX_LOGS:]
-    elif etype == "section_complete" and event.get("section"):
-        section = event["section"]
-        doc[section] = event.get("data")
-        await add_ai_response(
-            project_id, doc["user_id"], f"section:{section}", payload=event.get("data")
-        )
     elif etype == "progress":
         doc["progress"] = event.get("progress", 0)
     elif etype == "error":

@@ -1,8 +1,8 @@
 """WebSocket streaming of orchestration events to the browser.
 
-On connect the client receives a full snapshot, then the buffered event history
-(so a late joiner sees the whole run), then live events. Events carry a
-monotonic ``seq`` which is used to de-duplicate across the buffer/live boundary.
+On connect the client receives a full snapshot, then durable events for the
+current PostgreSQL-backed job. Polling the append-only event table makes the
+stream work across multiple API replicas without process-local pub/sub state.
 """
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.auth import websocket_user
 from app.core.logging import get_logger
-from app.services.event_bus import event_bus
 from app.services import projects as project_service
+from app.services import orchestration_store
 
 logger = get_logger("api.stream")
 router = APIRouter()
@@ -37,29 +37,36 @@ async def stream(websocket: WebSocket, project_id: str) -> None:
     # 1. Full snapshot so the client can render immediately.
     await websocket.send_json({"type": "snapshot", "project": doc})
 
-    max_seq = 0
     try:
-        # 2. Replay buffered events (subscribed first, so nothing is lost).
-        buffered = event_bus.get_buffer(project_id)
-        for event in buffered:
-            max_seq = max(max_seq, int(event.get("seq", 0)))
-            await websocket.send_json(event)
-
         # If the run already finished, no live events will arrive.
         if doc.get("status") in ("complete", "failed"):
             await websocket.send_json({"type": "stream_end"})
             return
 
-        # 3. Stream live events from in-memory event bus
-        async for event in event_bus.subscribe(project_id):
-            seq = int(event.get("seq", 0))
-            if seq > 0 and seq <= max_seq:
-                continue
-            max_seq = max(max_seq, seq)
-            await websocket.send_json(event)
-            if event.get("type") in ("run_complete", "run_failed"):
-                await websocket.send_json({"type": "stream_end"})
-                break
+        job_id = await orchestration_store.latest_job(project_id)
+        if job_id is None:
+            await websocket.send_json({"type": "error", "message": "orchestration job not found"})
+            await websocket.send_json({"type": "stream_end"})
+            return
+
+        max_event_id = 0
+        idle_polls = 0
+        while True:
+            events = await orchestration_store.events_after(job_id, max_event_id)
+            for event in events:
+                max_event_id = max(max_event_id, int(event.get("event_id", 0)))
+                await websocket.send_json(event)
+                if event.get("type") in ("run_complete", "run_failed"):
+                    await websocket.send_json({"type": "stream_end"})
+                    return
+            idle_polls = idle_polls + 1 if not events else 0
+            if idle_polls >= 4:
+                latest = await project_service.get_project(project_id, user.id)
+                if latest and latest.get("status") in ("complete", "failed"):
+                    await websocket.send_json({"type": "stream_end"})
+                    return
+                idle_polls = 0
+            await asyncio.sleep(0.75)
 
     except WebSocketDisconnect:
         logger.info("Client disconnected from %s stream", project_id)

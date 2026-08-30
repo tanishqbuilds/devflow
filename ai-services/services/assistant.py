@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from llm.langchain_client import get_chat_model
 from llm.router import FAST_MODEL
+from services.rag import format_retrieved_context, retrieve_for_agent
 from prompts.context import (
     summarize_architecture,
     summarize_backlog,
@@ -114,6 +115,10 @@ async def chat(
 ) -> AssistantCommand:
     model = get_chat_model(model=FAST_MODEL, temperature=0.45, max_tokens=600)
     context = build_project_context(project)
+    retrieved = await retrieve_for_agent(
+        str(project.get("id", "")), "product_manager", message, limit=6
+    )
+    evidence = format_retrieved_context(retrieved, max_chars=6000)
     messages = [
         SystemMessage(content=f"{SYSTEM_PROMPT}\n\n--- PROJECT CONTEXT ---\n{context}"),
     ]
@@ -128,7 +133,7 @@ async def chat(
 
     command_model = model.with_structured_output(AssistantCommand)
     compact_json=__import__('json').dumps(project,default=str,separators=(",",":"))[:10000]
-    messages[0] = SystemMessage(content=f"{SYSTEM_PROMPT}\n\nYou are named Flowmate. You may edit the workspace when the user asks. For an edit request, return the smallest set of JSON-pointer edits targeting existing user-facing fields; never target id, user_id, workspace_id, revision, orchestration, status, or progress. For a question, return no edits. Always set reply and make edits an array.\n\n--- PROJECT SUMMARY ---\n{context}\n\n--- EDITABLE PROJECT JSON (TRUNCATED) ---\n{compact_json}")
+    messages[0] = SystemMessage(content=f"{SYSTEM_PROMPT}\n\nYou are named Flowmate. You may edit the workspace when the user asks. For an edit request, return the smallest set of JSON-pointer edits targeting existing user-facing fields; never target id, user_id, workspace_id, revision, orchestration, status, or progress. For a question, return no edits. Always set reply and make edits an array. When retrieved evidence materially supports an answer, cite its identifier exactly as [SOURCE kind:key#chunk].\n\n--- PROJECT SUMMARY ---\n{context}\n\n--- RETRIEVED EVIDENCE ---\n{evidence}\n\n--- EDITABLE PROJECT JSON (TRUNCATED) ---\n{compact_json}")
     try:
         return await command_model.ainvoke(messages)
     except Exception as exc:

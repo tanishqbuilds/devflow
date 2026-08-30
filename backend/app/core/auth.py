@@ -92,8 +92,10 @@ async def _ensure_demo_user() -> CurrentUser:
 
 
 async def authenticate_token(token: str) -> CurrentUser:
-    if settings.bypass_auth or token in ("demo", "demo-bypass-token") or not settings.clerk_issuer_url:
+    if settings.bypass_auth:
         return await _ensure_demo_user()
+    if not settings.clerk_issuer_url:
+        raise HTTPException(status_code=503, detail="Clerk is not configured")
     try:
         claims = await asyncio.to_thread(_decode_token, token)
         user_id = str(claims["sub"])
@@ -136,6 +138,8 @@ async def current_user(
 
 async def websocket_user(websocket: WebSocket) -> CurrentUser:
     token = websocket.query_params.get("token")
-    if not token or settings.bypass_auth:
+    if settings.bypass_auth:
         return await _ensure_demo_user()
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
     return await authenticate_token(token)
