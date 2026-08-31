@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Type
+from typing import TYPE_CHECKING, Any, Callable, Type
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from state.project_state import ProjectState
 
 from llm.router import resolve
 from utils.logging import get_logger
@@ -30,7 +33,7 @@ class Agent:
     system_prompt: str
     build_user_prompt: Callable[[dict[str, Any]], str]
 
-    async def run(self, ctx: dict[str, Any], directive: str | None = None) -> dict[str, Any]:
+    async def run(self, ctx: "ProjectState", directive: str | None = None) -> dict[str, Any]:
         """Execute the agent against the project context, returning a plain dict."""
         started = time.time()
         logger.info("▶ %s (%s) starting%s", self.name, self.id, f" with directive: {directive[:60]}" if directive else "")

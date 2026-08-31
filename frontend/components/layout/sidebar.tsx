@@ -62,10 +62,7 @@ const groups: SidebarGroup[] = [
   {
     label: 'Deliver',
     items: [
-      { mode: 'milestones', label: 'Timeline', icon: <CalendarRange /> },
-      { mode: 'cost', label: 'Cost & Budget', icon: <DollarSign /> },
-      { mode: 'team', label: 'Team Roles', icon: <Users /> },
-      { mode: 'integrations', label: 'DevOps & CI/CD', icon: <Plug /> },
+      { mode: 'integrations', label: 'Deployment Strategy', icon: <Plug /> },
     ],
   },
   {

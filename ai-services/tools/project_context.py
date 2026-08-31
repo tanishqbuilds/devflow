@@ -1,8 +1,7 @@
-"""Agent-scoped project context retrieval.
+"""Agent-scoped project context retrieval (v2 — 6-agent roster).
 
-This is deliberately a tool instead of dumping all workflow state into every
-prompt. Each specialist receives the full records it depends on, while derived
-artifacts (diagram coordinates, Mermaid text and cost calculations) are omitted.
+Maps each agent to the upstream sections it depends on, so downstream
+agents receive only what they need instead of the entire accumulated state.
 """
 from __future__ import annotations
 
@@ -12,14 +11,12 @@ from typing import Any
 from langchain_core.tools import tool
 
 DEPENDENCIES: dict[str, tuple[str, ...]] = {
-    "ceo": (),
-    "product_manager": ("executive_summary",),
-    "architect": ("executive_summary", "requirements"),
-    "sprint_planner": ("executive_summary", "requirements", "architecture"),
-    "risk": ("executive_summary", "requirements", "architecture"),
-    "team_allocation": ("executive_summary", "architecture", "backlog"),
-    "timeline": ("executive_summary", "architecture", "backlog", "team"),
-    "integration": ("executive_summary", "requirements", "architecture"),
+    "requirement_agent": (),
+    "architect_agent": ("requirements",),
+    "sprint_planner_agent": ("requirements", "architecture"),
+    "github_monitor": ("backlog",),
+    "risk_agent": ("requirements", "architecture", "backlog", "github_progress"),
+    "deployment_advisor": ("requirements", "architecture", "risks"),
 }
 
 _DERIVED_ARCHITECTURE_KEYS = {"diagram", "mermaid"}

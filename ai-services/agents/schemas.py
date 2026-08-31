@@ -1,9 +1,14 @@
-"""Structured output schemas for every Devflow agent.
+"""Structured output schemas for the DEVFLOW agent roster (v2 — LangGraph).
 
-Each agent is given a JSON schema (derived from these Pydantic models) and is
-required to return data matching it. The LLM-facing schemas intentionally avoid
-volatile fields like server-generated ids; those are added during normalization
-in the backend. This keeps small local models reliable.
+Changes from v1:
+  - ExecutiveSummary merged INTO RequirementsBundle (the Requirement Agent
+    produces both vision and requirements in one pass).
+  - SprintPlan expanded to include task allocation (assignee, skills matching)
+    and timeline (milestones). No separate TeamPlan or TimelinePlan.
+  - New GitHubProgressReport for the GitHub Monitor Agent.
+  - New DeploymentRecommendation replacing IntegrationBundle.
+  - Removed: CEOReview, SupervisionDirective (replaced by human-in-the-loop).
+  - Kept: RiskBundle (enhanced with GitHub progress awareness).
 """
 from __future__ import annotations
 
@@ -18,41 +23,10 @@ RequirementCategory = Literal[
 ]
 RiskCategory = Literal["technical", "product", "delivery", "security", "scalability"]
 MilestonePhase = Literal["mvp", "beta", "production", "scaling"]
-IntegrationCategory = Literal[
-    "github", "calendar", "deployment", "payments", "communication", "analytics", "other"
-]
 
 
 # --------------------------------------------------------------------------- #
-# CEO Agent — Executive Summary
-# --------------------------------------------------------------------------- #
-class ExecutiveSummary(BaseModel):
-    project_title: str = Field(..., description="A concise, marketable product name")
-    tagline: str = Field(..., description="One-sentence positioning statement")
-    vision: str = Field(..., description="The long-term vision for the product")
-    overview: str = Field(..., description="2-4 sentence project overview")
-    business_goals: List[str] = Field(..., min_length=2)
-    success_criteria: List[str] = Field(..., min_length=2)
-    target_users: List[str] = Field(..., min_length=1)
-    key_differentiators: List[str] = Field(..., min_length=1)
-    competitive_landscape: str = Field(
-        default="", description="Brief analysis of competitive landscape and positioning"
-    )
-    go_to_market: str = Field(
-        default="", description="High-level go-to-market strategy or launch approach"
-    )
-    key_decisions: List[str] = Field(
-        default_factory=list,
-        description="Binding strategic decisions downstream agents must respect",
-    )
-    complexity_score: int = Field(..., ge=1, le=100, description="1=trivial, 100=extreme")
-    complexity_label: Literal["Low", "Moderate", "High", "Very High"]
-    estimated_duration_weeks: int = Field(..., ge=1, le=260)
-    recommended_team_size: int = Field(..., ge=1, le=200)
-
-
-# --------------------------------------------------------------------------- #
-# Product Manager Agent — Requirements
+# Requirement Agent — Executive Summary + Requirements (merged)
 # --------------------------------------------------------------------------- #
 class RequirementItem(BaseModel):
     title: str = Field(default="")
@@ -79,10 +53,6 @@ class RequirementItem(BaseModel):
                 cat = data["category"].lower().strip().replace("-", "_")
                 valid = {"frontend", "backend", "security", "ai", "integrations", "infrastructure"}
                 if cat not in valid:
-                    # NFR models commonly use labels such as performance,
-                    # scalability, reliability, compliance, or UX. They are
-                    # still valid requirements; map them to the closest
-                    # supported delivery area instead of rejecting the run.
                     data["category"] = {
                         "ux": "frontend", "usability": "frontend",
                         "performance": "infrastructure", "scalability": "infrastructure",
@@ -123,15 +93,45 @@ class UserStory(BaseModel):
 
 
 class RequirementsBundle(BaseModel):
+    """Output of the Requirement Agent — includes executive summary + requirements."""
+    # Executive summary fields (merged from old CEO agent)
+    project_title: str = Field(default="", description="A concise, descriptive product name")
+    tagline: str = Field(default="", description="One-sentence positioning statement")
+    vision: str = Field(default="", description="Long-term vision for the product")
+    overview: str = Field(default="", description="2-4 sentence project overview")
+    business_goals: List[str] = Field(default_factory=list)
+    success_criteria: List[str] = Field(default_factory=list)
+    target_users: List[str] = Field(default_factory=list)
+    key_differentiators: List[str] = Field(default_factory=list)
+    complexity_score: int = Field(default=50, ge=1, le=100, description="1=trivial, 100=extreme")
+    complexity_label: Literal["Low", "Moderate", "High", "Very High"] = "Moderate"
+    estimated_duration_weeks: int = Field(default=12, ge=1, le=260)
+    recommended_team_size: int = Field(default=4, ge=1, le=200)
+
+    # Requirements
     functional_requirements: List[RequirementItem] = Field(default_factory=list)
     non_functional_requirements: List[RequirementItem] = Field(default_factory=list)
     user_stories: List[UserStory] = Field(default_factory=list)
     scope_in: List[str] = Field(default_factory=list)
     scope_out: List[str] = Field(default_factory=list)
 
+    # Gap analysis (new — helps the manager review)
+    clarifying_questions: List[str] = Field(
+        default_factory=list,
+        description="Questions the manager should answer to refine requirements",
+    )
+    assumptions: List[str] = Field(
+        default_factory=list,
+        description="Assumptions made where the input was vague",
+    )
+    missing_requirements: List[str] = Field(
+        default_factory=list,
+        description="Requirements that are likely needed but not mentioned",
+    )
+
 
 # --------------------------------------------------------------------------- #
-# System Architect Agent — Architecture
+# System Architect Agent — Architecture (kept mostly the same)
 # --------------------------------------------------------------------------- #
 class ArchitectureLayer(BaseModel):
     summary: str = Field(default="")
@@ -162,6 +162,11 @@ class ArchitectureBundle(BaseModel):
     technology_recommendations: List[str] = Field(default_factory=list)
     scalability_plan: List[str] = Field(default_factory=list)
     integration_points: List[str] = Field(default_factory=list)
+    # Explanation in simple terms for non-technical managers
+    architecture_rationale: str = Field(
+        default="",
+        description="Plain-language explanation of why this architecture was chosen",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -175,7 +180,7 @@ class ArchitectureBundle(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Sprint Planner Agent — Backlog, Tasks, Sprints
+# Sprint Planner Agent — Backlog + Task Allocation + Timeline (merged)
 # --------------------------------------------------------------------------- #
 class Epic(BaseModel):
     title: str = Field(default="")
@@ -199,6 +204,19 @@ class TaskItem(BaseModel):
         default="",
         description="Specific criteria for marking this task complete",
     )
+    # Task allocation fields (merged from old team_allocation agent)
+    required_skills: List[str] = Field(
+        default_factory=list,
+        description="Skills needed to complete this task",
+    )
+    assigned_to: str = Field(
+        default="",
+        description="Name/role of the team member assigned to this task",
+    )
+    assignment_reason: str = Field(
+        default="",
+        description="Why this person/role was chosen for this task",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -220,16 +238,74 @@ class Sprint(BaseModel):
     task_titles: List[str] = Field(default_factory=list)
 
 
+class MilestoneItem(BaseModel):
+    """Timeline milestone (merged from old timeline agent)."""
+    title: str = Field(default="")
+    description: str = Field(default="")
+    phase: MilestonePhase = Field(default="mvp")
+    start_week: int = Field(default=1, ge=0)
+    duration_weeks: int = Field(default=2, ge=1, le=104)
+    deliverables: List[str] = Field(default_factory=list)
+    dependencies: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_milestone(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "phase" in data and isinstance(data["phase"], str):
+                p = data["phase"].lower()
+                valid = {"mvp", "beta", "production", "scaling"}
+                if p not in valid:
+                    data["phase"] = "mvp"
+            for key in ["deliverables", "dependencies"]:
+                val = data.get(key)
+                if isinstance(val, str):
+                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
+        return data
+
+
+class TeamRoleRecommendation(BaseModel):
+    """Recommended team role (merged from old team_allocation agent)."""
+    role: str = Field(default="")
+    seniority: str = Field(default="Senior")
+    count: int = Field(default=1, ge=1, le=20)
+    skills: List[str] = Field(default_factory=list)
+    responsibilities: List[str] = Field(default_factory=list)
+    allocation_pct: int = Field(default=100, ge=10, le=100)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_role(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            s = data.get("seniority", "Senior")
+            if isinstance(s, str):
+                s_map = {"junior": "Junior", "mid": "Mid", "senior": "Senior", "lead": "Lead", "principal": "Principal"}
+                data["seniority"] = s_map.get(s.lower(), s.capitalize() if s else "Senior")
+            for key in ["skills", "responsibilities"]:
+                val = data.get(key)
+                if isinstance(val, str):
+                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
+        return data
+
+
 class SprintPlan(BaseModel):
+    """Unified output: backlog + task allocation + timeline (all from one agent)."""
     methodology: str = "Scrum"
     sprint_length_weeks: int = Field(default=2, ge=1, le=4)
     epics: List[Epic] = Field(default_factory=list)
     tasks: List[TaskItem] = Field(default_factory=list)
     sprints: List[Sprint] = Field(default_factory=list)
+    # Timeline (merged from old timeline agent)
+    milestones: List[MilestoneItem] = Field(default_factory=list)
+    total_duration_weeks: int = Field(default=12, ge=1)
+    critical_path: List[str] = Field(default_factory=list)
+    # Team roles (merged from old team_allocation agent)
+    recommended_roles: List[TeamRoleRecommendation] = Field(default_factory=list)
+    staffing_notes: List[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
-# Risk Agent — Risk Analysis
+# Risk Agent — Risk Analysis (enhanced for GitHub progress)
 # --------------------------------------------------------------------------- #
 class RiskItem(BaseModel):
     title: str = Field(default="")
@@ -241,11 +317,11 @@ class RiskItem(BaseModel):
     mitigation: str = Field(default="")
     cost_of_delay_per_week: str = Field(
         default="",
-        description="Estimated business cost if this risk materializes and is unaddressed per week",
+        description="Estimated business cost if this risk materializes",
     )
     compounds_with: List[str] = Field(
         default_factory=list,
-        description="Titles of other risks this one amplifies or is amplified by",
+        description="Titles of other risks this one amplifies",
     )
 
     @model_validator(mode="before")
@@ -266,7 +342,7 @@ class RiskItem(BaseModel):
 
 
 class RiskBundle(BaseModel):
-    risks: List[RiskItem] = Field(default_factory=list, description="Cover technical, product, delivery, security, scalability")
+    risks: List[RiskItem] = Field(default_factory=list)
     overall_risk_level: Literal["Low", "Moderate", "High", "Critical"] = "Moderate"
     summary: str = Field(default="")
 
@@ -282,164 +358,55 @@ class RiskBundle(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Team Allocation Agent — Staffing
+# GitHub Monitor Agent — Progress Report (new)
 # --------------------------------------------------------------------------- #
-class TeamMember(BaseModel):
-    role: str = Field(default="")
-    seniority: str = Field(default="Senior")
-    count: int = Field(default=1, ge=1, le=20)
-    skills: List[str] = Field(default_factory=list)
-    responsibilities: List[str] = Field(default_factory=list)
-    allocation_pct: int = Field(default=100, ge=10, le=100)
-    owns_area: str = Field(
-        default="",
-        description="The architecture layer or backlog area this role primarily owns",
+class TaskProgress(BaseModel):
+    """Progress estimate for a single task based on GitHub activity."""
+    task_title: str = Field(default="")
+    status: Literal["not_started", "in_progress", "likely_complete", "unknown"] = "unknown"
+    evidence: str = Field(default="", description="What GitHub data supports this assessment")
+    confidence: Literal["high", "medium", "low"] = "low"
+
+
+class GitHubProgressReport(BaseModel):
+    """Output of the GitHub Monitor Agent."""
+    commit_summary: str = Field(default="", description="Overview of recent commit activity")
+    pr_summary: str = Field(default="", description="PR statistics and status")
+    branch_activity: List[str] = Field(default_factory=list, description="Active branches")
+    task_progress: List[TaskProgress] = Field(default_factory=list)
+    concerns: List[str] = Field(default_factory=list, description="Observed warning signs")
+    recommendations: List[str] = Field(default_factory=list, description="Suggested actions")
+    data_available: bool = Field(
+        default=False,
+        description="Whether GitHub data was actually available for analysis",
     )
-    onboarding_weeks: int = Field(
-        default=2, ge=1, le=12,
-        description="Estimated onboarding ramp-up time in weeks",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_member(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            s = data.get("seniority", "Senior")
-            if isinstance(s, str):
-                s_map = {"junior": "Junior", "mid": "Mid", "senior": "Senior", "lead": "Lead", "principal": "Principal"}
-                data["seniority"] = s_map.get(s.lower(), s.capitalize() if s else "Senior")
-            for key in ["skills", "responsibilities"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
-        return data
-
-
-class TeamPlan(BaseModel):
-    members: List[TeamMember] = Field(default_factory=list)
-    staffing_notes: List[str] = Field(default_factory=list)
-    ownership: List[str] = Field(default_factory=list, description="Who owns which area")
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_plan(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            for key in ["staffing_notes", "ownership"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split("\n") if x.strip()]
-        return data
 
 
 # --------------------------------------------------------------------------- #
-# Timeline Agent — Milestones & Roadmap
+# Deployment Advisor — Recommendations (new, replaces IntegrationBundle)
 # --------------------------------------------------------------------------- #
-class MilestoneItem(BaseModel):
-    title: str = Field(default="")
-    description: str = Field(default="")
-    phase: MilestonePhase = Field(default="mvp")
-    start_week: int = Field(default=1, ge=0)
-    duration_weeks: int = Field(default=2, ge=1, le=104)
-    deliverables: List[str] = Field(default_factory=list)
-    dependencies: List[str] = Field(default_factory=list)
-    go_no_go_criteria: List[str] = Field(
-        default_factory=list,
-        description="Criteria that must be met before transitioning to the next phase",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_milestone(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            if "phase" in data and isinstance(data["phase"], str):
-                p = data["phase"].lower()
-                valid = {"mvp", "beta", "production", "scaling"}
-                if p not in valid:
-                    data["phase"] = "mvp"
-            for key in ["deliverables", "dependencies", "go_no_go_criteria"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split(",") if x.strip()]
-        return data
-
-
-class TimelinePlan(BaseModel):
-    milestones: List[MilestoneItem] = Field(default_factory=list)
-    total_duration_weeks: int = Field(default=12, ge=1)
-    critical_path: List[str] = Field(default_factory=list)
+class DeploymentRecommendation(BaseModel):
+    """Output of the Deployment Advisor Agent."""
+    deployment_architecture: str = Field(default="", description="Hosting and orchestration recommendation")
+    environment_config: List[str] = Field(default_factory=list, description="Environment setup recommendations")
+    cicd_pipeline: List[str] = Field(default_factory=list, description="CI/CD pipeline steps")
+    infrastructure_requirements: List[str] = Field(default_factory=list)
+    monitoring_observability: List[str] = Field(default_factory=list)
+    maintenance_practices: List[str] = Field(default_factory=list)
+    scaling_considerations: List[str] = Field(default_factory=list)
+    security_hardening: List[str] = Field(default_factory=list)
+    estimated_monthly_cost_usd: int = Field(default=0, ge=0, description="Rough monthly infra cost")
+    cost_breakdown: List[str] = Field(default_factory=list, description="Per-service cost breakdown")
 
 
 # --------------------------------------------------------------------------- #
-# Integration Agent — Integrations & Deployment
+# Schema registry (agent_id -> output schema)
 # --------------------------------------------------------------------------- #
-class IntegrationItem(BaseModel):
-    name: str = Field(default="")
-    category: IntegrationCategory = Field(default="other")
-    purpose: str = Field(default="")
-    steps: List[str] = Field(default_factory=list)
-    auth_method: str = Field(
-        default="",
-        description="Authentication method (e.g. OAuth2, API Key, JWT, Webhook Secret)",
-    )
-    rollback_steps: List[str] = Field(
-        default_factory=list,
-        description="Steps to safely rollback or disable this integration",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_integration(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            if "category" in data and isinstance(data["category"], str):
-                cat = data["category"].lower()
-                valid = {"github", "calendar", "deployment", "payments", "communication", "analytics", "other"}
-                if cat not in valid:
-                    data["category"] = "other"
-            for key in ["steps", "rollback_steps"]:
-                val = data.get(key)
-                if isinstance(val, str):
-                    data[key] = [x.strip() for x in val.split("\n") if x.strip()]
-        return data
-
-
-class IntegrationBundle(BaseModel):
-    integrations: List[IntegrationItem] = Field(default_factory=list)
-    deployment_plan: List[str] = Field(default_factory=list)
-    cicd_recommendations: List[str] = Field(default_factory=list)
-
-
-# --------------------------------------------------------------------------- #
-# CEO Supervision — Review Schema
-# --------------------------------------------------------------------------- #
-class SupervisionDirective(BaseModel):
-    agent_id: str = Field(..., description="The agent that needs to re-run")
-    reason: str = Field(..., description="Specific issue the agent must address")
-    priority: Priority = "high"
-
-
-class CEOReview(BaseModel):
-    passed: bool = Field(
-        ..., description="True if the collective output is coherent and production-ready"
-    )
-    overall_assessment: str = Field(
-        ..., description="1-3 sentence summary of the overall plan quality"
-    )
-    strengths: List[str] = Field(default_factory=list)
-    weaknesses: List[str] = Field(default_factory=list)
-    directives: List[SupervisionDirective] = Field(
-        default_factory=list,
-        description="Agents that should re-run with targeted feedback (empty if passed)",
-    )
-
-
-# Registry of agent_id -> output schema, used by the workflow engine and tests.
 AGENT_SCHEMAS: dict[str, type[BaseModel]] = {
-    "ceo": ExecutiveSummary,
-    "product_manager": RequirementsBundle,
-    "architect": ArchitectureBundle,
-    "sprint_planner": SprintPlan,
-    "risk": RiskBundle,
-    "team_allocation": TeamPlan,
-    "timeline": TimelinePlan,
-    "integration": IntegrationBundle,
+    "requirement_agent": RequirementsBundle,
+    "architect_agent": ArchitectureBundle,
+    "sprint_planner_agent": SprintPlan,
+    "github_monitor": GitHubProgressReport,
+    "risk_agent": RiskBundle,
+    "deployment_advisor": DeploymentRecommendation,
 }

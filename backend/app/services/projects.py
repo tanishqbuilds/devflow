@@ -204,35 +204,38 @@ async def apply_event(project_id: str, event: dict[str, Any]) -> None:
     now = _now()
     if etype == "node_update" and event.get("node"):
         node = event["node"]
-        doc["orchestration"]["nodes"][node].update(
-            status=event.get("status", "idle"), progress=event.get("progress", 0)
-        )
         doc["orchestration"]["current_node"] = node
+        state_update = event.get("state", {})
+        
+        # Mark node as complete if it yielded a state update
+        if node in doc["orchestration"]["nodes"]:
+            doc["orchestration"]["nodes"][node].update(status="complete", progress=100)
+            
+        # Extract section payloads from state update
+        for key in ["requirements", "architecture", "backlog", "github_progress", "risks", "deployment_recommendations"]:
+            if key in state_update:
+                doc[key] = state_update[key]
+                await add_ai_response(
+                    project_id, doc["user_id"], f"section:{key}", payload=state_update[key]
+                )
+                
+        # Extract iteration state
+        for key in ["approvals", "manager_feedback", "pending_approval"]:
+            if key in state_update:
+                doc[key] = state_update[key]
+                
+    elif etype == "paused_for_approval":
+        doc["pending_approval"] = event.get("pending_approval")
+        doc["status"] = "awaiting_approval"
     elif etype == "log":
         doc["orchestration"]["logs"] = (doc["orchestration"]["logs"] + [{
             "agent": event.get("agent"), "level": event.get("level", "info"),
             "message": event.get("message", ""), "ts": event.get("ts"),
         }])[-_MAX_LOGS:]
-    elif etype == "section_complete" and event.get("section"):
-        section = event["section"]
-        doc[section] = event.get("data")
-        await add_ai_response(
-            project_id, doc["user_id"], f"section:{section}", payload=event.get("data")
-        )
     elif etype == "progress":
         doc["progress"] = event.get("progress", 0)
-    elif etype == "error":
+    elif etype == "error" or etype == "run_failed":
         doc["error"] = event.get("message")
-    elif etype == "run_failed":
-        doc["error"] = event.get("message")
-    elif etype == "supervisor_review":
-        await add_ai_response(
-            project_id, doc["user_id"], "supervisor_review", payload=event
-        )
-    elif etype == "supervisor_directive":
-        await add_ai_response(
-            project_id, doc["user_id"], "supervisor_directive", payload=event
-        )
     else:
         return
     doc["updated_at"] = now

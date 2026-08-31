@@ -30,6 +30,14 @@ async def enqueue_analysis(project_id: str) -> None:
     logger.info("Enqueued analysis job for project %s", project_id)
 
 
+async def enqueue_approval(project_id: str, phase: str, approved: bool, feedback: str) -> None:
+    """Start an approval stream consumption task immediately."""
+    logger.info("Starting approval task for project %s (phase: %s)", project_id, phase)
+    task = asyncio.create_task(_consume_approval(project_id, phase, approved, feedback))
+    _workers.append(task)
+    task.add_done_callback(_workers.remove)
+
+
 async def _consume_run(project_id: str) -> None:
     """Stream events from ai-services, buffer in memory, and persist to database."""
     deadline = asyncio.get_event_loop().time() + settings.run_timeout_seconds
@@ -64,16 +72,20 @@ async def _consume_run(project_id: str) -> None:
                 # Persist to Supabase / PostgreSQL
                 await project_service.apply_event(project_id, event)
 
+                if event.get("type") == "paused_for_approval":
+                    logger.info("Run %s paused for approval", project_id)
+                    await project_service.set_status(project_id, "awaiting_approval")
+                    return
                 if event.get("type") == "run_complete":
                     await project_service.set_status(project_id, "complete", progress=100)
                     logger.info("Run %s complete", project_id)
                     return
-                if event.get("type") == "run_failed":
-                    missing = ", ".join(event.get("missing_sections") or [])
+                if event.get("type") == "run_failed" or event.get("type") == "error":
+                    missing = event.get("message", "Unknown error")
                     await project_service.set_status(
                         project_id, "failed", error=f"Incomplete AI output: {missing}"
                     )
-                    logger.error("Run %s incomplete: %s", project_id, missing)
+                    logger.error("Run %s failed: %s", project_id, missing)
                     return
 
             # If stream finished cleanly without explicit run_complete / run_failed
@@ -100,6 +112,37 @@ async def _consume_run(project_id: str) -> None:
                 project_id, "queued", error=f"AI service reconnecting (attempt {attempt})"
             )
             await asyncio.sleep(delay)
+
+
+async def _consume_approval(project_id: str, phase: str, approved: bool, feedback: str) -> None:
+    """Stream events from ai-services after an approval, buffer in memory, and persist to database."""
+    try:
+        async for event in ai_services.approve_workflow(project_id, phase, approved, feedback):
+            if _shutdown.is_set():
+                break
+
+            await event_bus.publish(project_id, event)
+            await project_service.apply_event(project_id, event)
+
+            if event.get("type") == "run_complete":
+                await project_service.set_status(project_id, "complete", progress=100)
+                logger.info("Run %s complete", project_id)
+                return
+            if event.get("type") == "paused_for_approval":
+                logger.info("Run %s paused for approval again", project_id)
+                await project_service.set_status(project_id, "awaiting_approval")
+                return
+            if event.get("type") == "run_failed" or event.get("type") == "error":
+                await project_service.set_status(project_id, "failed", error=event.get("message", "Unknown error"))
+                return
+                
+        # If stream finishes
+        doc = await project_service.get_project(project_id)
+        if doc and doc.get("status") == "running":
+            await project_service.set_status(project_id, "complete", progress=100)
+    except Exception as exc:
+        logger.error("Approval stream error for %s: %s", project_id, exc)
+        await project_service.set_status(project_id, "failed", error=f"Approval stream error: {exc}")
 
 
 async def _project_inputs(project_id: str) -> tuple[str, str | None]:

@@ -12,9 +12,7 @@ import { ArchitectureView } from './architecture-view'
 import { RequirementsView } from './requirements-view'
 import { BacklogView } from './backlog-view'
 import { RiskView } from './risk-view'
-import { TeamView } from './team-view'
-import { CostView } from './cost-view'
-import { MilestonesView } from './milestones-view'
+
 import { IntegrationsView } from './integrations-view'
 import { SprintBoardView } from './sprint-board-view'
 import { InsightsView } from './insights-view'
@@ -98,13 +96,6 @@ export function WorkspaceClient() {
         return <SprintBoardView />
       case 'risks':
         return <RiskView />
-      case 'cost':
-        return <CostView />
-      case 'team':
-        return <TeamView />
-      case 'milestones':
-      case 'timeline':
-        return <MilestonesView />
       case 'integrations':
         return <IntegrationsView />
       default:
