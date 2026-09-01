@@ -92,21 +92,44 @@ cd ..
 Open 3 terminal windows (or tabs) and run:
 
 **Terminal 1 — Backend API (:8000)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-backend
-# or: cd backend && source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Using `uvicorn` directly (all platforms including Windows):
+```bash
+cd backend
+.venv\Scripts\activate  # Windows PowerShell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Terminal 2 — AI Services (:8001)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-ai
-# or: cd ai-services && source .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+Using `uvicorn` directly (all platforms including Windows):
+```bash
+cd ai-services
+.venv\Scripts\activate  # Windows PowerShell
+python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 **Terminal 3 — Frontend UI (:3000)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-frontend
-# or: cd frontend && npm run dev -- -p 3000
+```
+
+Using `npm` directly:
+```bash
+cd frontend
+npm run dev -- -p 3000
 ```
 
 Open **http://localhost:3000** in your browser!
