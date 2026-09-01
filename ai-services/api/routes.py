@@ -105,23 +105,46 @@ async def stream_workflow(req: WorkflowRunRequest) -> StreamingResponse:
             }
 
             # Start or resume the graph
-            async for event in compiled.astream(initial_state, config, stream_mode="updates"):
-                # event is a dict mapping node_name -> state_update
-                for node, state_update in event.items():
-                    msg = {
-                        "type": "node_update",
-                        "node": node,
-                        "state": state_update
-                    }
-                    yield json.dumps(msg, default=str) + "\n"
+            async for event in compiled.astream(initial_state, config, stream_mode=["updates", "debug"]):
+                if len(event) == 2 and isinstance(event[0], str):
+                    mode, payload = event
+                    
+                    if mode == "debug" and payload.get("type") == "task:runs":
+                        node_name = payload.get("payload", {}).get("name")
+                        if node_name and not node_name.startswith("__"):
+                            yield json.dumps({
+                                "type": "log",
+                                "agent": node_name,
+                                "level": "info",
+                                "message": f"Starting {node_name} processing...",
+                                "ts": datetime.now(timezone.utc).isoformat()
+                            }) + "\n"
+                            
+                    elif mode == "updates":
+                        # payload is a dict mapping node_name -> state_update
+                        for node, state_update in payload.items():
+                            msg = {
+                                "type": "node_update",
+                                "node": node,
+                                "state": state_update
+                            }
+                            yield json.dumps(msg, default=str) + "\n"
 
             # Check if graph ended or paused for approval
             final_state = await compiled.aget_state(config)
             if final_state.next:
                 # Graph paused at an interrupt
+                next_node = final_state.next[0]
+                pending = final_state.values.get("pending_approval")
+                if not pending:
+                    if next_node == "await_req_approval": pending = "requirements"
+                    elif next_node == "await_arch_approval": pending = "architecture"
+                    elif next_node == "await_sprint_approval": pending = "sprint_planning"
+                    elif next_node == "await_sprint_review": pending = "sprint_review"
+                
                 yield json.dumps({
                     "type": "paused_for_approval",
-                    "pending_approval": final_state.values.get("pending_approval")
+                    "pending_approval": pending
                 }) + "\n"
             else:
                 yield json.dumps({"type": "run_complete"}) + "\n"
@@ -171,27 +194,50 @@ async def approve_workflow(req: ApprovalRequest) -> StreamingResponse:
                 })
                 update["manager_feedback"] = manager_feedback
 
-            # We use 'as_node' to pretend the update came from the node that paused
-            # But the simplest is to just update state and resume
-            await compiled.aupdate_state(config, update)
+            # We MUST use `as_node=state.next[0]` to pretend the update came from the node that paused.
+            # Otherwise, LangGraph simply re-runs the paused node and asks for approval again!
+            await compiled.aupdate_state(config, update, as_node=state.next[0])
             
             # Resume execution by passing None as input
-            async for event in compiled.astream(None, config, stream_mode="updates"):
-                for node, state_update in event.items():
-                    msg = {
-                        "type": "node_update",
-                        "node": node,
-                        "state": state_update
-                    }
-                    yield json.dumps(msg, default=str) + "\n"
+            async for event in compiled.astream(None, config, stream_mode=["updates", "debug"]):
+                if len(event) == 2 and isinstance(event[0], str):
+                    mode, payload = event
+                    
+                    if mode == "debug" and payload.get("type") == "task:runs":
+                        node_name = payload.get("payload", {}).get("name")
+                        if node_name and not node_name.startswith("__"):
+                            yield json.dumps({
+                                "type": "log",
+                                "agent": node_name,
+                                "level": "info",
+                                "message": f"Starting {node_name} processing...",
+                                "ts": datetime.now(timezone.utc).isoformat()
+                            }) + "\n"
+                            
+                    elif mode == "updates":
+                        for node, state_update in payload.items():
+                            msg = {
+                                "type": "node_update",
+                                "node": node,
+                                "state": state_update
+                            }
+                            yield json.dumps(msg, default=str) + "\n"
                     
             # Check if graph ended or paused for approval
             final_state = await compiled.aget_state(config)
             if final_state.next:
                 # Graph paused at an interrupt
+                next_node = final_state.next[0]
+                pending = final_state.values.get("pending_approval")
+                if not pending:
+                    if next_node == "await_req_approval": pending = "requirements"
+                    elif next_node == "await_arch_approval": pending = "architecture"
+                    elif next_node == "await_sprint_approval": pending = "sprint_planning"
+                    elif next_node == "await_sprint_review": pending = "sprint_review"
+                
                 yield json.dumps({
                     "type": "paused_for_approval",
-                    "pending_approval": final_state.values.get("pending_approval")
+                    "pending_approval": pending
                 }) + "\n"
             else:
                 yield json.dumps({"type": "run_complete"}) + "\n"

@@ -35,4 +35,8 @@ def select_project_context(agent_id: str, project_context: dict[str, Any]) -> st
             value = {k: v for k, v in value.items() if k not in _DERIVED_ARCHITECTURE_KEYS}
         if value is not None:
             selected[key] = value
-    return json.dumps(selected, ensure_ascii=False, separators=(",", ":"), default=str)
+    result = json.dumps(selected, ensure_ascii=False, separators=(",", ":"), default=str)
+    # Truncate to stay within free-tier TPM limits (~2500 chars ≈ 700 tokens)
+    if len(result) > 2500:
+        result = result[:2500] + '..."}'
+    return result

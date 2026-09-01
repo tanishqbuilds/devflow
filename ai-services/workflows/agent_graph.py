@@ -40,13 +40,50 @@ class AgentGraphState(TypedDict, total=False):
 
 
 def _structured(model: Any, schema: type[BaseModel]) -> Any:
-    # Groq's tool-calling parser is brittle with large nested schemas: a model
-    # response containing a duplicate key or an unfamiliar enum is rejected by
-    # Groq before Pydantic gets a chance to normalize it. JSON mode lets us
-    # validate and normalize the complete response locally instead. Other
-    # providers retain native structured output support.
     if LLM_PROVIDER.lower() == "groq":
-        return model.with_structured_output(schema, method="json_mode")
+        from langchain_core.runnables import RunnableLambda
+        import re
+        import json
+        def _parse(ai_msg):
+            text = ai_msg.content
+            # Strip Qwen 3 thinking tokens — they appear before the actual JSON
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+            # Try to extract from markdown block
+            m = re.search(r"```(?:json)?\n(.*?)\n```", text, re.DOTALL)
+            if m:
+                text = m.group(1)
+            else:
+                m = re.search(r"(\{.*\})", text, re.DOTALL)
+                if m:
+                    text = m.group(1)
+            
+            # Brute-force JSON closure to handle truncation
+            text = text.rstrip()
+            if text.endswith(","):
+                text = text[:-1]
+                
+            closures = ["", "}", "]}", "]}]}", '"]}', '"}', '"}', '"]}]}']
+            parsed = None
+            last_err = None
+            
+            for closure in closures:
+                try:
+                    parsed = json.loads(text + closure)
+                    break
+                except Exception as e:
+                    last_err = e
+                    
+            if parsed is None:
+                # If manual brute-force fails, try LangChain's partial parser as a last resort
+                from langchain_core.utils.json import parse_partial_json
+                try:
+                    parsed = parse_partial_json(text)
+                except Exception as e:
+                    raise ValueError(f"Failed to parse JSON: {last_err}\nRaw output: {text}")
+            
+            return schema.model_validate(parsed)
+            
+        return model | RunnableLambda(_parse)
     return model.with_structured_output(schema)
 
 
@@ -77,8 +114,20 @@ def build_agent_graph(
             ("system", f"CRITICAL CEO SUPERVISOR DIRECTIVE (you MUST address this):\n{directive}")
         )
     sys_messages.append(("system", "Authoritative project context (JSON):\n{scoped_context}\n\nResults from callable specialist tools:\n{tool_insights}"))
-    schema_str = json.dumps(schema.model_json_schema(), indent=2).replace("{", "{{").replace("}", "}}")
-    sys_messages.append(("system", f"Return only one valid JSON object matching the following schema:\n```json\n{schema_str}\n```\nDo not return a function/tool envelope, markdown, or commentary."))
+    # Build a compact field summary instead of the full JSON schema to save tokens
+    # (Pydantic validates locally, so the model only needs field names)
+    def _compact_schema(s: type[BaseModel]) -> str:
+        lines = []
+        for name, field in s.model_fields.items():
+            ann = field.annotation
+            type_hint = getattr(ann, '__name__', str(ann)).replace('typing.', '')
+            desc = f" — {field.description}" if field.description else ""
+            lines.append(f"  {name}: {type_hint}{desc}")
+        return "\n".join(lines)
+    schema_hint = _compact_schema(schema)
+    # Qwen 3 models support /no_think to skip chain-of-thought and go straight to JSON
+    no_think = "/no_think\n" if "qwen" in model_config.model.lower() else ""
+    sys_messages.append(("system", f"{no_think}Respond with ONLY a valid JSON object. Required fields:\n{schema_hint}"))
 
     generation_prompt = ChatPromptTemplate.from_messages(
         [

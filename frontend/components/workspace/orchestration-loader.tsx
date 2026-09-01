@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useProjectStore } from '@/lib/project-store'
-import { retryProject } from '@/lib/api'
+import { retryProject, approveProject } from '@/lib/api'
 import {
   Lightbulb,
   Search,
@@ -270,13 +270,13 @@ export function OrchestrationLoader({ onDismiss }: { onDismiss?: () => void }) {
                 className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm font-semibold hover:bg-emerald-700"
                 onClick={async () => {
                   const fb = (document.getElementById('feedback-input') as HTMLTextAreaElement).value
-                  await fetch(`/api/projects/${project.id}/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    body: JSON.stringify({ phase: project.pending_approval, approved: true, feedback: fb })
-                  })
-                  // Trigger reload or state update
-                  window.location.reload()
+                  try {
+                    await approveProject(project.id, project.pending_approval, true, fb)
+                    // UI will auto-update via polling / WebSocket
+                  } catch (err) {
+                    console.error('Failed to approve:', err)
+                    alert('Failed to approve project.')
+                  }
                 }}
               >
                 Approve & Continue
@@ -286,12 +286,13 @@ export function OrchestrationLoader({ onDismiss }: { onDismiss?: () => void }) {
                 onClick={async () => {
                   const fb = (document.getElementById('feedback-input') as HTMLTextAreaElement).value
                   if (!fb) { alert('Please provide feedback for revision'); return; }
-                  await fetch(`/api/projects/${project.id}/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    body: JSON.stringify({ phase: project.pending_approval, approved: false, feedback: fb })
-                  })
-                  window.location.reload()
+                  try {
+                    await approveProject(project.id, project.pending_approval, false, fb)
+                    // UI will auto-update via polling / WebSocket
+                  } catch (err) {
+                    console.error('Failed to reject:', err)
+                    alert('Failed to reject project.')
+                  }
                 }}
               >
                 Reject & Revise

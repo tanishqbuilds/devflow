@@ -30,15 +30,12 @@ class ModelConfig:
 
 
 _PROFILES: dict[str, ModelConfig] = {
-    "ceo": ModelConfig(SMART_MODEL, 0.5, 1000),
-    "product_manager": ModelConfig(SMART_MODEL, 0.4, 2600),
-    "architect": ModelConfig(SMART_MODEL, 0.35, 2200),
-    "sprint_planner": ModelConfig(FAST_MODEL, 0.3, 2600),
-    "risk": ModelConfig(FAST_MODEL, 0.4, 1200),
-    "team_allocation": ModelConfig(FAST_MODEL, 0.4, 1000),
-    "timeline": ModelConfig(SMART_MODEL, 0.35, 1200),
-    "integration": ModelConfig(FAST_MODEL, 0.4, 1000),
-    "ceo_review": ModelConfig(SMART_MODEL, 0.2, 700),
+    "requirement_agent": ModelConfig(SMART_MODEL, 0.4, 3500),
+    "architect_agent": ModelConfig(SMART_MODEL, 0.35, 3500),
+    "sprint_planner_agent": ModelConfig(SMART_MODEL, 0.3, 3500),
+    "github_monitor": ModelConfig(FAST_MODEL, 0.3, 1500),
+    "risk_agent": ModelConfig(FAST_MODEL, 0.4, 1500),
+    "deployment_advisor": ModelConfig(FAST_MODEL, 0.4, 2000),
 }
 
 

@@ -25,6 +25,15 @@ RiskCategory = Literal["technical", "product", "delivery", "security", "scalabil
 MilestonePhase = Literal["mvp", "beta", "production", "scaling"]
 
 
+def _ensure_lists(data: dict, *keys: str) -> dict:
+    """Convert any string values to single-element lists for the given keys."""
+    for key in keys:
+        val = data.get(key)
+        if isinstance(val, str):
+            data[key] = [val]
+    return data
+
+
 # --------------------------------------------------------------------------- #
 # Requirement Agent — Executive Summary + Requirements (merged)
 # --------------------------------------------------------------------------- #
@@ -46,6 +55,7 @@ class RequirementItem(BaseModel):
     @classmethod
     def normalize_req_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            _ensure_lists(data, "depends_on")
             effort = data.get("estimated_effort_days")
             if effort is None or (isinstance(effort, (int, float)) and effort < 0.5):
                 data["estimated_effort_days"] = 0.5
@@ -78,6 +88,7 @@ class UserStory(BaseModel):
     @classmethod
     def normalize_story_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            _ensure_lists(data, "acceptance_criteria")
             if "as_a" not in data or not data["as_a"]:
                 data["as_a"] = data.get("asA") or data.get("role") or data.get("user") or data.get("persona") or "user"
             if "i_want" not in data or not data["i_want"]:
@@ -128,6 +139,18 @@ class RequirementsBundle(BaseModel):
         default_factory=list,
         description="Requirements that are likely needed but not mentioned",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_bundle(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            _ensure_lists(
+                data,
+                "business_goals", "success_criteria", "target_users",
+                "key_differentiators", "scope_in", "scope_out",
+                "clarifying_questions", "assumptions", "missing_requirements",
+            )
+        return data
 
 
 # --------------------------------------------------------------------------- #
@@ -222,6 +245,7 @@ class TaskItem(BaseModel):
     @classmethod
     def normalize_task(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            _ensure_lists(data, "dependencies", "required_skills")
             if "description" not in data or not data["description"]:
                 data["description"] = data.get("definition_of_done") or data.get("title") or ""
             if "estimated_days" not in data:
@@ -255,8 +279,7 @@ class MilestoneItem(BaseModel):
             if "phase" in data and isinstance(data["phase"], str):
                 p = data["phase"].lower()
                 valid = {"mvp", "beta", "production", "scaling"}
-                if p not in valid:
-                    data["phase"] = "mvp"
+                data["phase"] = p if p in valid else "mvp"
             for key in ["deliverables", "dependencies"]:
                 val = data.get(key)
                 if isinstance(val, str):

@@ -191,3 +191,17 @@ export async function updateBacklog(projectId: string, backlog: any): Promise<{ 
 }
 export async function getProjectMembers(projectId:string):Promise<{members:any[];role:'owner'|'admin'|'editor'|'viewer'}>{const res=await fetch(endpoint.projectAction(projectId, 'members'),{headers:await authHeaders()});return jsonOrThrow(res)}
 export async function updateProjectTask(projectId:string,index:number,payload:{assignee_id?:string|null;status?:string;expected_revision?:number}){const res=await fetch(endpoint.projectTask(projectId, index),{method:'PATCH',headers:await authHeaders(true),body:JSON.stringify(payload)});return jsonOrThrow(res)}
+
+export async function approveProject(
+  projectId: string,
+  phase: string,
+  approved: boolean,
+  feedback: string = ''
+): Promise<any> {
+  const res = await fetch(endpoint.projectAction(projectId, 'approve'), {
+    method: 'POST',
+    headers: await authHeaders(true),
+    body: JSON.stringify({ phase, approved, feedback }),
+  })
+  return jsonOrThrow(res)
+}
