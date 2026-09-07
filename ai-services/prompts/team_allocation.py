@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from prompts.context import build_base_context
-
 SYSTEM_PROMPT = (
     "You are a VP of Engineering planning the team to build this product. Recommend the roles "
     "needed (e.g. Engineering Lead, Senior Frontend Engineer, Backend Engineer, Senior AI/ML Engineer, "
@@ -21,10 +19,8 @@ SYSTEM_PROMPT = (
 
 
 def build_user_prompt(ctx: dict[str, Any]) -> str:
-    context = build_base_context(ctx, include=["executive", "architecture", "backlog"])
     return (
         f"Founder's idea:\n\"{ctx.get('idea', '')}\"\n\n"
-        f"{context}\n\n"
         "Recommend the staffing plan: 4-8 roles with seniority, counts, skills, responsibilities, "
         "owns_area, and onboarding_weeks. Ensure the roles can deliver the architecture and backlog above."
     )

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from prompts.context import build_base_context
-
 SYSTEM_PROMPT = (
     "You are a world-class Senior Product Manager. Given the product vision, you produce "
     "rigorous, buildable requirements.\n"
@@ -31,7 +29,6 @@ SYSTEM_PROMPT = (
 
 
 def build_user_prompt(ctx: dict[str, Any]) -> str:
-    context = build_base_context(ctx, include=["executive"])
     # Extract CEO decisions if available
     es = ctx.get("executive_summary", {})
     decisions = es.get("key_decisions", []) if isinstance(es, dict) else []
@@ -43,7 +40,7 @@ def build_user_prompt(ctx: dict[str, Any]) -> str:
         )
     return (
         f"Founder's idea:\n\"{ctx.get('idea', '')}\"\n\n"
-        f"{context}{decisions_block}\n\n"
+        f"{decisions_block}\n\n"
         "Produce a complete requirements bundle. Aim for 6-10 functional requirements "
         "(each with estimated_effort_days and depends_on), "
         "4-6 non-functional requirements, and 5-8 user stories with concrete "

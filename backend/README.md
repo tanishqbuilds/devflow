@@ -10,7 +10,8 @@ The backend coordinates authenticated REST and WebSocket APIs, persists Clerk us
 - **ASGI Server**: Uvicorn
 - **Object Mapping / Schemas**: Pydantic v2
 - **Database Driver**: asyncpg (PostgreSQL / Supabase with SSL)
-- **Event Dispatch**: In-Memory Event Bus & Async Job Queue
+- **Event Dispatch**: PostgreSQL durable queue, leased workers, and append-only event replay
+- **Retrieval Storage**: pgvector + PostgreSQL full-text search with workspace/project scoping
 
 ---
 
@@ -24,7 +25,7 @@ backend/
 │   ├── db/             # PostgreSQL / Supabase connection pooling & schema
 │   ├── models/         # Pydantic schemas and database models
 │   ├── orchestrator/   # Workflow management and event streaming
-│   ├── services/       # In-memory event bus, projects, AI client
+│   ├── services/       # Durable queue/events, projects, sources, AI client
 │   └── main.py         # FastAPI application entrypoint
 │
 ├── Dockerfile          # Container build configuration
@@ -46,6 +47,7 @@ backend/
   "uptime_seconds": 12.4,
   "dependencies": {
     "database": "healthy",
+    "rag_index": "healthy",
     "ai_services": "healthy"
   }
 }

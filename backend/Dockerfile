@@ -28,4 +28,6 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["/app/.venv/bin/gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-"]
+# Jobs and event replay are PostgreSQL-backed, so API replicas and Gunicorn
+# workers share one durable queue. WEB_CONCURRENCY can be tuned per deployment.
+CMD ["sh", "-c", "exec /app/.venv/bin/gunicorn app.main:app --workers ${WEB_CONCURRENCY:-2} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --access-logfile - --error-logfile -"]

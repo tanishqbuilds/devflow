@@ -12,8 +12,8 @@ Devflow is an autonomous AI software architecture and delivery planning platform
                     │  backend (FastAPI) — orchestration layer         │  :8000
                     │  • POST /projects/analyze  GET /projects/:id     │
                     │  • WS  /projects/:id/stream                      │
-                    │  • In-memory job queue + event bus + buffer      │
-                    │  • Supabase (PostgreSQL) persistence             │
+                    │  • Durable job queue + replayable event stream   │
+                    │  • Supabase PostgreSQL + pgvector hybrid RAG     │
                     └────────┬────────────────────────────────┬────────┘
                              │ HTTP Stream (SSE / NDJSON)     │ SSL Connection Pool
                     ┌────────▼──────────────┐         ┌───────▼──────────────┐
@@ -92,21 +92,44 @@ cd ..
 Open 3 terminal windows (or tabs) and run:
 
 **Terminal 1 — Backend API (:8000)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-backend
-# or: cd backend && source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Using `uvicorn` directly (all platforms including Windows):
+```bash
+cd backend
+.venv\Scripts\activate  # Windows PowerShell
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Terminal 2 — AI Services (:8001)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-ai
-# or: cd ai-services && source .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+Using `uvicorn` directly (all platforms including Windows):
+```bash
+cd ai-services
+.venv\Scripts\activate  # Windows PowerShell
+python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 **Terminal 3 — Frontend UI (:3000)**:
+
+Using `make` (Linux/macOS):
 ```bash
 make local-frontend
-# or: cd frontend && npm run dev -- -p 3000
+```
+
+Using `npm` directly:
+```bash
+cd frontend
+npm run dev -- -p 3000
 ```
 
 Open **http://localhost:3000** in your browser!
@@ -183,4 +206,7 @@ CEO ─▶ Product Manager ─▶ System Architect ─┬▶ Sprint Planner ─�
 
 - **Database**: Connects directly to **Supabase** (or any PostgreSQL instance) using async connection pooling (`asyncpg`) with automatic SSL. Database tables and indexes are initialized automatically on startup.
 - **Authentication**: Powered by **Clerk**. Set `BYPASS_AUTH=true` in `.env` for local testing without authentication, or provide `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for multi-user authentication.
-- **Event Streaming**: Uses an in-memory async event broker with WebSocket streaming and late-joiner replay buffer — no Redis or external broker installation needed.
+- **RAG & Memory**: Project sources, prior validated outputs, and distilled decisions are indexed with pgvector plus PostgreSQL full-text search. Every retrieval is scoped by workspace and project and recorded in the agent run trace.
+- **Event Streaming**: Uses PostgreSQL-backed jobs and append-only events with WebSocket replay, so multiple API replicas can safely claim work and serve live clients without Redis.
+
+The rationale, schema review, and production checklist are documented in [docs/saas-rag-orchestration.md](docs/saas-rag-orchestration.md).

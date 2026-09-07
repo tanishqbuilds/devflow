@@ -62,6 +62,7 @@ CREATE INDEX IF NOT EXISTS projects_workspace_created_idx ON projects(workspace_
 CREATE TABLE IF NOT EXISTS project_revisions (
     id BIGSERIAL PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    request JSONB NOT NULL DEFAULT '{}'::jsonb,
     actor_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
     revision INTEGER NOT NULL,
     operation TEXT NOT NULL,
@@ -84,6 +85,164 @@ CREATE TABLE IF NOT EXISTS ai_responses (
 );
 CREATE INDEX IF NOT EXISTS ai_responses_project_created_idx
     ON ai_responses(project_id, created_at ASC);
+
+-- Tenant-scoped source documents used by the RAG pipeline. The project JSONB
+-- document remains the UI read model; these records retain source provenance.
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE IF NOT EXISTS project_documents (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    created_by TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE RESTRICT,
+    title TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'text'
+        CHECK (source_type IN ('text', 'spec', 'repo', 'tickets', 'url', 'file')),
+    mime_type TEXT NOT NULL DEFAULT 'text/plain',
+    content TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'indexed', 'failed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(project_id, content_sha256)
+);
+CREATE INDEX IF NOT EXISTS project_documents_project_idx
+    ON project_documents(project_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS project_documents_workspace_idx
+    ON project_documents(workspace_id, created_at DESC);
+
+-- Hybrid RAG index: pgvector similarity plus PostgreSQL full-text ranking.
+-- Every row carries workspace_id and project_id so retrieval cannot cross a
+-- tenant boundary even if a caller supplies an adversarial query.
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id BIGSERIAL PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    document_id TEXT REFERENCES project_documents(id) ON DELETE CASCADE,
+    source_kind TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    source_title TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+    content TEXT NOT NULL,
+    token_count INTEGER NOT NULL DEFAULT 0 CHECK (token_count >= 0),
+    content_sha256 TEXT NOT NULL,
+    embedding VECTOR(384) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    search_vector TSVECTOR GENERATED ALWAYS AS
+        (to_tsvector('english', coalesce(source_title, '') || ' ' || content)) STORED,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(project_id, source_kind, source_key, chunk_index)
+);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_scope_idx
+    ON knowledge_chunks(workspace_id, project_id, source_kind);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_search_idx
+    ON knowledge_chunks USING GIN(search_vector);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx
+    ON knowledge_chunks USING HNSW (embedding vector_cosine_ops);
+
+-- Durable memories are distilled facts/decisions, not raw chat history. They
+-- are separately searchable and supersedable to avoid stale-context buildup.
+CREATE TABLE IF NOT EXISTS project_memories (
+    id BIGSERIAL PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    memory_type TEXT NOT NULL
+        CHECK (memory_type IN ('decision', 'constraint', 'fact', 'feedback', 'lesson')),
+    content TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    importance SMALLINT NOT NULL DEFAULT 3 CHECK (importance BETWEEN 1 AND 5),
+    embedding VECTOR(384) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    search_vector TSVECTOR GENERATED ALWAYS AS
+        (to_tsvector('english', content)) STORED,
+    superseded_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE project_memories ADD COLUMN IF NOT EXISTS content_sha256 TEXT;
+ALTER TABLE project_memories ADD COLUMN IF NOT EXISTS search_vector TSVECTOR
+    GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+CREATE INDEX IF NOT EXISTS project_memories_scope_idx
+    ON project_memories(workspace_id, project_id, agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS project_memories_embedding_idx
+    ON project_memories USING HNSW (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS project_memories_search_idx
+    ON project_memories USING GIN(search_vector);
+CREATE UNIQUE INDEX IF NOT EXISTS project_memories_active_digest_idx
+    ON project_memories(project_id, agent_id, memory_type, content_sha256)
+    WHERE superseded_at IS NULL;
+
+-- One run and many steps provide provenance for retrieval, tools, generation,
+-- validation, retries, and supervision. This is the operational audit trail
+-- missing from a plain AI_RESPONSE table.
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    trigger TEXT NOT NULL DEFAULT 'analysis',
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'complete', 'failed', 'cancelled')),
+    input JSONB NOT NULL DEFAULT '{}'::jsonb,
+    output_summary JSONB NOT NULL DEFAULT '{}'::jsonb,
+    metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+    error TEXT,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS agent_runs_project_idx
+    ON agent_runs(project_id, started_at DESC);
+CREATE TABLE IF NOT EXISTS agent_run_steps (
+    id BIGSERIAL PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('started', 'complete', 'failed', 'skipped')),
+    tool_name TEXT,
+    input_context JSONB NOT NULL DEFAULT '{}'::jsonb,
+    output JSONB NOT NULL DEFAULT '{}'::jsonb,
+    duration_ms INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS agent_run_steps_run_idx
+    ON agent_run_steps(run_id, id);
+
+-- Durable orchestration queue and replay log. PostgreSQL SKIP LOCKED permits
+-- multiple API/worker replicas without duplicate project execution.
+CREATE TABLE IF NOT EXISTS orchestration_jobs (
+    id BIGSERIAL PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    request JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'complete', 'failed', 'cancelled')),
+    attempt INTEGER NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    locked_at TIMESTAMPTZ,
+    locked_by TEXT,
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+ALTER TABLE orchestration_jobs
+    ADD COLUMN IF NOT EXISTS request JSONB NOT NULL DEFAULT '{}'::jsonb;
+CREATE UNIQUE INDEX IF NOT EXISTS orchestration_jobs_one_active_project_idx
+    ON orchestration_jobs(project_id) WHERE status IN ('queued', 'running');
+CREATE INDEX IF NOT EXISTS orchestration_jobs_claim_idx
+    ON orchestration_jobs(status, available_at, created_at);
+CREATE TABLE IF NOT EXISTS orchestration_events (
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT NOT NULL REFERENCES orchestration_jobs(id) ON DELETE CASCADE,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS orchestration_events_job_idx
+    ON orchestration_events(job_id, id);
+CREATE INDEX IF NOT EXISTS orchestration_events_project_idx
+    ON orchestration_events(project_id, id DESC);
 """
 
 
@@ -141,7 +300,11 @@ async def init_postgres() -> None:
     _pool = await asyncpg.create_pool(clean_dsn, **kwargs)
     async with _pool.acquire() as conn:
         await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
-        await conn.execute(SCHEMA)
+        await conn.execute("SELECT pg_advisory_lock(hashtext('devflow_schema_v2'))")
+        try:
+            await conn.execute(SCHEMA)
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock(hashtext('devflow_schema_v2'))")
     logger.info("PostgreSQL / Supabase schema ensured")
 
 

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from prompts.context import build_base_context
-
 SYSTEM_PROMPT = (
     "You are a principal System Architect. Design a pragmatic, production-grade architecture "
     "for the product across four layers: frontend, backend, database, and infrastructure.\n\n"
@@ -20,7 +18,6 @@ SYSTEM_PROMPT = (
 
 
 def build_user_prompt(ctx: dict[str, Any]) -> str:
-    context = build_base_context(ctx, include=["executive", "requirements"])
     es = ctx.get("executive_summary", {})
     decisions = es.get("key_decisions", []) if isinstance(es, dict) else []
     decisions_block = ""
@@ -31,7 +28,7 @@ def build_user_prompt(ctx: dict[str, Any]) -> str:
         )
     return (
         f"Founder's idea:\n\"{ctx.get('idea', '')}\"\n\n"
-        f"{context}{decisions_block}\n\n"
+        f"{decisions_block}\n\n"
         "Design the full architecture. Ensure the database layer lists main data entities and key_entities "
         "with schema details, the backend lists services/modules and API routes, the frontend lists major UI surfaces "
         "and client state management, and infrastructure covers hosting, CI/CD, observability and scaling."

@@ -34,6 +34,16 @@ SECTION_KEYS = [
 ]
 
 
+class ProjectDocumentCreate(BaseModel):
+    """A text source that will be chunked and indexed for project-scoped RAG."""
+
+    title: str = Field(..., min_length=1, max_length=240)
+    content: str = Field(..., min_length=12, max_length=250_000)
+    source_type: str = Field(default="text", pattern="^(text|spec|repo|tickets|url|file)$")
+    mime_type: str = Field(default="text/plain", max_length=120)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class AnalyzeRequest(BaseModel):
     idea: str = Field(..., min_length=8, max_length=4000)
     title: Optional[str] = Field(default=None, max_length=200)
@@ -44,6 +54,7 @@ class AnalyzeRequest(BaseModel):
     team_skills: list[str] = Field(default_factory=list, max_length=30)
     priorities: list[str] = Field(default_factory=list, max_length=20)
     constraints: str = Field(default="", max_length=3000)
+    source_documents: list[ProjectDocumentCreate] = Field(default_factory=list, max_length=12)
 
 
 class AnalyzeResponse(BaseModel):

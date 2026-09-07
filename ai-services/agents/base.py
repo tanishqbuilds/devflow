@@ -13,7 +13,7 @@ from typing import Any, Callable, Type
 
 from pydantic import BaseModel
 
-from llm.router import resolve
+from llm.router import ModelConfig, resolve
 from utils.logging import get_logger
 from workflows.agent_graph import build_agent_graph
 
@@ -30,7 +30,12 @@ class Agent:
     system_prompt: str
     build_user_prompt: Callable[[dict[str, Any]], str]
 
-    async def run(self, ctx: dict[str, Any], directive: str | None = None) -> dict[str, Any]:
+    async def run(
+        self,
+        ctx: dict[str, Any],
+        directive: str | None = None,
+        model_config: ModelConfig | None = None,
+    ) -> dict[str, Any]:
         """Execute the agent against the project context, returning a plain dict."""
         started = time.time()
         logger.info("▶ %s (%s) starting%s", self.name, self.id, f" with directive: {directive[:60]}" if directive else "")
@@ -38,7 +43,7 @@ class Agent:
             agent_id=self.id,
             system_prompt=self.system_prompt,
             schema=self.schema,
-            model_config=resolve(self.id),
+            model_config=model_config or resolve(self.id),
             directive=directive,
         )
         state = await graph.ainvoke(
