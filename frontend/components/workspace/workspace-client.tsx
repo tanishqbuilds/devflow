@@ -21,6 +21,8 @@ import { InsightsView } from './insights-view'
 import { DocumentationView } from './documentation-view'
 import { OrchestrationLoader } from './orchestration-loader'
 import { WorkspaceEditProvider } from './workspace-editor'
+import { TeamManagement } from './team-management'
+import { ProjectRoleProvider } from '@/components/auth/permission-guard'
 
 export function WorkspaceClient() {
   const router = useRouter()
@@ -102,6 +104,8 @@ export function WorkspaceClient() {
         return <CostView />
       case 'team':
         return <TeamView />
+      case 'members':
+        return <TeamManagement />
       case 'milestones':
       case 'timeline':
         return <MilestonesView />
@@ -113,8 +117,10 @@ export function WorkspaceClient() {
   }
 
   return (
-    <WorkspaceEditProvider>
-      <div className="w-full">{renderView()}</div>
-    </WorkspaceEditProvider>
+    <ProjectRoleProvider projectId={projectId}>
+      <WorkspaceEditProvider>
+        <div className="w-full">{renderView()}</div>
+      </WorkspaceEditProvider>
+    </ProjectRoleProvider>
   )
 }

@@ -15,7 +15,8 @@ interface AppUser {
   fullName: string
   imageUrl: string
   primaryEmailAddress: { emailAddress: string }
-  role?: 'manager' | 'developer'
+  role?: 'manager' | 'developer' | 'tester'
+  specialization?: string
 }
 
 interface AuthContextType {
@@ -39,7 +40,7 @@ const MOCK_DEMO_USER: AppUser = {
   fullName: 'Demo User',
   imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
   primaryEmailAddress: { emailAddress: 'demo@devflow.ai' },
-  role: 'developer',
+  role: 'manager',
 }
 
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH !== 'false'
@@ -50,9 +51,18 @@ const HAS_CLERK_KEY = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 /* ------------------------------------------------------------------ */
 
 function BypassAuthProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<'manager' | 'developer'>('developer')
+  const [role, setRole] = useState<'manager' | 'developer' | 'tester'>('manager')
+  const [isSignedIn, setIsSignedIn] = useState(true)
 
   const tokenProvider = useCallback(async () => 'demo-bypass-token', [])
+
+  // Check if user was logged out previously
+  useEffect(() => {
+    const isLoggedOut = localStorage.getItem('devflow_bypass_logout') === 'true'
+    if (isLoggedOut) {
+      setIsSignedIn(false)
+    }
+  }, [])
 
   useEffect(() => {
     setAuthTokenProvider(tokenProvider)
@@ -60,6 +70,9 @@ function BypassAuthProvider({ children }: { children: React.ReactNode }) {
   }, [tokenProvider])
 
   useEffect(() => {
+    // Only sync if user is still signed in
+    if (!isSignedIn) return
+
     syncUser({
       clerk_id: MOCK_DEMO_USER.id,
       email: MOCK_DEMO_USER.primaryEmailAddress.emailAddress,
@@ -69,21 +82,39 @@ function BypassAuthProvider({ children }: { children: React.ReactNode }) {
     }).then(res => {
       if (res?.role) setRole(res.role)
     }).catch(console.error)
-  }, [])
+  }, [isSignedIn])
 
   const user = useMemo<AppUser>(() => ({ ...MOCK_DEMO_USER, role }), [role])
 
+  const handleSignOut = useCallback(async () => {
+    // Mark as logged out in localStorage
+    localStorage.setItem('devflow_bypass_logout', 'true')
+    setIsSignedIn(false)
+    // Redirect to home page
+    window.location.href = '/'
+  }, [])
+
+  const handleSignIn = useCallback(async () => {
+    // Clear logout flag and mark as signed in
+    localStorage.removeItem('devflow_bypass_logout')
+    setIsSignedIn(true)
+    // Redirect to my-projects after sign in
+    setTimeout(() => {
+      window.location.href = '/my-projects'
+    }, 100)
+  }, [])
+
   const value = useMemo<AuthContextType>(() => ({
-    isSignedIn: true,
+    isSignedIn,
     isLoaded: true,
-    user,
-    signOut: async () => {},
-    signIn: () => {},
-    signUp: () => {},
+    user: isSignedIn ? user : null,
+    signOut: handleSignOut,
+    signIn: handleSignIn,
+    signUp: handleSignIn,
     updateProfile: () => {},
     isClerk: false,
     getToken: tokenProvider,
-  }), [user, tokenProvider])
+  }), [user, tokenProvider, handleSignOut, handleSignIn, isSignedIn])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -98,7 +129,8 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isSignedIn: clerkIsSignedIn, isLoaded: clerkIsLoaded } = useUser()
   const { getToken: clerkGetToken } = useAuth()
   const { signOut, openSignIn, openSignUp } = useClerk()
-  const [role, setRole] = useState<'manager' | 'developer'>('developer')
+  const [role, setRole] = useState<'manager' | 'developer' | 'tester' | undefined>()
+  const [specialization, setSpecialization] = useState<string | undefined>()
 
   const activeTokenProvider = useCallback(async () => {
     if (clerkIsSignedIn && clerkUser) {
@@ -124,6 +156,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
 
     syncUser(activeUser).then(res => {
       if (res?.role) setRole(res.role)
+      if (res?.specialization) setSpecialization(res.specialization)
     }).catch(console.error)
   }, [clerkUser, clerkIsSignedIn])
 
@@ -137,6 +170,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
         imageUrl: clerkUser.imageUrl,
         primaryEmailAddress: { emailAddress: clerkUser.primaryEmailAddress?.emailAddress ?? '' },
         role,
+        specialization,
       }
     }
     return null

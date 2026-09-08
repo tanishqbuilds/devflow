@@ -99,8 +99,8 @@ async def chat(
     edits = result.get("edits", [])
     updated_doc = doc
     if edits and req.apply_changes:
-        role = await project_service.project_role(project_id, user.id)
-        if role not in {"owner", "admin", "editor"}:
+        from app.services import rbac
+        if not await rbac.check_project_permission(project_id, user.id, "edit_content"):
             raise HTTPException(status_code=403, detail="edit permission required")
         for edit in edits:
             updated_doc = await project_service.edit_content(
@@ -118,7 +118,8 @@ async def chat(
 
 @router.get("")
 async def list_projects(user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    return {"projects": await project_service.list_projects(user.id)}
+    from app.services import rbac
+    return {"projects": await rbac.get_user_projects(user.id)}
 
 
 @router.get("/{project_id}")
@@ -179,9 +180,8 @@ class UpdateBacklogRequest(BaseModel):
 
 @router.put("/{project_id}/backlog")
 async def update_backlog(project_id: str, req: UpdateBacklogRequest, user: CurrentUser = Depends(current_user)) -> dict[str, Any]:
-    role = await project_service.project_role(project_id, user.id)
-    if not role: raise HTTPException(status_code=404, detail="project not found")
-    if role not in {"owner","admin","editor"}: raise HTTPException(status_code=403, detail="edit permission required")
+    from app.services import rbac
+    if not await rbac.check_project_permission(project_id, user.id, "edit_content"): raise HTTPException(status_code=403, detail="edit permission required")
     doc = await project_service.get_project(project_id, user.id)
     updated = await project_service.edit_content(project_id,user.id,"/backlog",req.backlog,doc.get("revision",0) if doc else 0)
     return {"status":"ok","project":updated}
@@ -200,9 +200,8 @@ class TaskUpdateRequest(BaseModel):
 
 @router.patch("/{project_id}/content")
 async def edit_project_content(project_id: str, req: ContentEditRequest, user: CurrentUser=Depends(current_user)) -> dict[str,Any]:
-    role=await project_service.project_role(project_id,user.id)
-    if not role: raise HTTPException(404,"project not found")
-    if role not in {"owner","admin","editor"}: raise HTTPException(403,"edit permission required")
+    from app.services import rbac
+    if not await rbac.check_project_permission(project_id, user.id, "edit_content"): raise HTTPException(403,"edit permission required")
     try: doc=await project_service.edit_content(project_id,user.id,req.path,req.value,req.expected_revision)
     except RuntimeError: raise HTTPException(409,"project changed; reload before saving")
     except (ValueError,KeyError,IndexError,TypeError) as exc: raise HTTPException(422,str(exc))
@@ -216,27 +215,28 @@ async def project_history(project_id: str,user: CurrentUser=Depends(current_user
 
 @router.get("/{project_id}/members")
 async def project_members(project_id:str,user:CurrentUser=Depends(current_user))->dict[str,Any]:
-    doc=await project_service.get_project(project_id,user.id)
-    if not doc: raise HTTPException(404,"project not found")
-    workspace_id=await project_service.ensure_project_workspace(project_id,doc)
-    return {"members":await workspace_service.members(workspace_id),"role":await project_service.project_role(project_id,user.id)}
+    from app.services import rbac
+    role = await rbac.get_project_role(project_id, user.id)
+    if not role: raise HTTPException(404,"project not found")
+    return {"members": await rbac.list_project_members(project_id), "role": role}
 
 @router.patch("/{project_id}/tasks/{task_index}")
 async def update_task(project_id:str,task_index:int,req:TaskUpdateRequest,user:CurrentUser=Depends(current_user))->dict[str,Any]:
     doc=await project_service.get_project(project_id,user.id)
-    role=await project_service.project_role(project_id,user.id)
+    from app.services import rbac
+    role = await rbac.get_project_role(project_id, user.id)
     if not doc or not role: raise HTTPException(404,"project not found")
     tasks=((doc.get("backlog") or {}).get("tasks") or [])
     if task_index<0 or task_index>=len(tasks): raise HTTPException(404,"task not found")
     task=tasks[task_index]
     if "assignee_id" in req.model_fields_set:
-        if role not in {"owner","admin","editor"}: raise HTTPException(403,"task assignment permission required")
-        workspace_id=await project_service.ensure_project_workspace(project_id,doc)
-        members=await workspace_service.members(workspace_id)
-        if req.assignee_id and req.assignee_id not in {m["user_id"] for m in members}: raise HTTPException(422,"assignee is not a workspace member")
+        if not rbac.check_permission(role, "assign_tasks"): raise HTTPException(403,"task assignment permission required")
+        members=await rbac.list_project_members(project_id)
+        if req.assignee_id and req.assignee_id not in {m["user_id"] for m in members}: raise HTTPException(422,"assignee is not a project member")
         task["assignee_id"]=req.assignee_id or None
     if req.status is not None:
-        if role not in {"owner","admin","editor"} and task.get("assignee_id")!=user.id: raise HTTPException(403,"only the assignee may update this task")
+        if not rbac.check_permission(role, "update_own_task"): raise HTTPException(403,"only the assignee may update this task")
+        if not rbac.check_permission(role, "assign_tasks") and task.get("assignee_id")!=user.id: raise HTTPException(403,"only the assignee may update this task")
         task["status"]=req.status
     updated=await project_service.edit_content(project_id,user.id,f"/backlog/tasks/{task_index}",task,req.expected_revision,operation="task_update")
     return {"project":updated,"task":task}
@@ -244,9 +244,8 @@ async def update_task(project_id:str,task_index:int,req:TaskUpdateRequest,user:C
 
 @router.post("/{project_id}/undo")
 async def undo_project(project_id: str,user: CurrentUser=Depends(current_user)) -> dict[str,Any]:
-    role=await project_service.project_role(project_id,user.id)
-    if not role: raise HTTPException(404,"project not found")
-    if role not in {"owner","admin","editor"}: raise HTTPException(403,"edit permission required")
+    from app.services import rbac
+    if not await rbac.check_project_permission(project_id, user.id, "edit_content"): raise HTTPException(403,"edit permission required")
     doc=await project_service.undo(project_id,user.id)
     if not doc: raise HTTPException(409,"nothing to undo")
     return {"project":doc}

@@ -11,6 +11,7 @@ export type WorkspaceMode =
   | 'risks'
   | 'cost'
   | 'team'
+  | 'members'
   | 'tech-stack'
   | 'integrations'
   | 'milestones'

@@ -30,6 +30,8 @@ async def create_project(idea: str, title: Optional[str], user_id: str, manager_
            VALUES ($1, $2, $3, $4, $5, $6, $7)""",
         doc["id"], user_id, workspace_id, doc["title"], doc["status"], doc["progress"], doc,
     )
+    from app.services.rbac import add_project_member
+    await add_project_member(doc["id"], user_id, "manager")
     logger.info("Created project %s for user %s", doc["id"], user_id)
     return doc
 
@@ -40,8 +42,8 @@ async def get_project(project_id: str, user_id: str | None = None) -> Optional[d
     else:
         row = await fetchrow(
             """SELECT p.document FROM projects p
-               LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=$2
-               WHERE p.id=$1 AND (p.user_id=$2 OR wm.user_id IS NOT NULL)""", project_id, user_id,
+               JOIN project_members pm ON pm.project_id=p.id AND pm.user_id=$2
+               WHERE p.id=$1""", project_id, user_id,
         )
     return dict(row["document"]) if row else None
 
@@ -49,8 +51,7 @@ async def get_project(project_id: str, user_id: str | None = None) -> Optional[d
 async def list_projects(user_id: str, limit: int = 50) -> list[dict[str, Any]]:
     rows = await fetch(
         """SELECT p.document FROM projects p
-           LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=$1
-           WHERE p.user_id=$1 OR wm.user_id IS NOT NULL
+           JOIN project_members pm ON pm.project_id=p.id AND pm.user_id=$1
            ORDER BY p.created_at DESC LIMIT $2""", user_id, limit,
     )
     keys = ("id", "title", "status", "progress", "created_at", "updated_at")
@@ -119,12 +120,9 @@ async def ensure_project_workspace(project_id:str,doc:dict[str,Any])->str:
 
 async def project_role(project_id: str, user_id: str) -> str | None:
     row = await fetchrow(
-        """SELECT CASE WHEN p.user_id=$2 THEN 'owner' ELSE wm.role END AS role
-           FROM projects p LEFT JOIN workspace_members wm
-             ON wm.workspace_id=p.workspace_id AND wm.user_id=$2
-           WHERE p.id=$1 AND (p.user_id=$2 OR wm.user_id IS NOT NULL)""", project_id, user_id,
+        "SELECT role FROM project_members WHERE project_id=$1 AND user_id=$2", project_id, user_id,
     )
-    return str(row["role"]) if row and row["role"] else None
+    return str(row["role"]) if row else None
 
 
 def _set_path(document: dict[str, Any], path: str, value: Any) -> None:
@@ -218,7 +216,7 @@ async def create_source_document(
 ) -> dict[str, Any]:
     """Persist a tenant-scoped source for the AI retrieval pipeline."""
     role = await project_role(project_id, user_id)
-    if role not in {"owner", "admin", "editor"}:
+    if role not in {"manager", "developer"}:
         raise PermissionError("document upload requires edit permission")
     doc = await get_project(project_id, user_id)
     if not doc:

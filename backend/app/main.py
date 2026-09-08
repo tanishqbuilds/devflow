@@ -55,6 +55,8 @@ app.include_router(agents_router)
 app.include_router(stream_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
+from app.api.rbac import router as rbac_router
+app.include_router(rbac_router)
 
 
 @app.get("/docs", include_in_schema=False)

@@ -1,11 +1,13 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { LayoutGrid, Clock, Layers, Link2, Gauge, UserCircle2 } from 'lucide-react'
+import { LayoutGrid, Clock, Layers, Link2, Gauge, UserCircle2, ChevronDown, Check, Filter } from 'lucide-react'
 import { useProjectStore } from '@/lib/project-store'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getProjectMembers, updateProjectTask } from '@/lib/api'
 import { InlineEditable } from './workspace-editor'
+import { useProjectRole } from '@/components/auth/permission-guard'
+import { useAppUser } from '@/lib/auth-context'
 
 const priorityPill: Record<string, string> = {
   critical: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -22,17 +24,124 @@ const loadBarColor: Record<string, string> = {
 
 const KANBAN_COLUMNS = ['To Do', 'In Progress', 'In Review', 'Done']
 
+// ---------------------------------------------------------------------------
+// Assignee picker dropdown (manager only)
+// ---------------------------------------------------------------------------
+function AssigneePicker({
+  value, users, onChange
+}: {
+  value: string | null
+  users: any[]
+  onChange: (id: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const assigned = users.find(u => u.user_id === value)
+  const name = assigned ? `${assigned.first_name || ''} ${assigned.last_name || ''}`.trim() || assigned.email : null
+  const avatarUrl = assigned?.image_url || (assigned ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=e2e8f0&color=475569&size=32` : null)
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-[11px] font-medium rounded-lg px-2 py-1 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors max-w-[150px]"
+      >
+        {assigned ? (
+          <>
+            <img src={avatarUrl!} className="w-4 h-4 rounded-full border border-slate-300 object-cover flex-shrink-0" alt={name || ''} />
+            <span className="truncate text-slate-700">{name}</span>
+          </>
+        ) : (
+          <>
+            <UserCircle2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-slate-400">Assign</span>
+          </>
+        )}
+        <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0 ml-auto" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="p-1">
+            <button
+              onClick={() => { onChange(null); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <UserCircle2 className="w-5 h-5 text-slate-300" />
+              <span>Unassigned</span>
+              {!value && <Check className="w-3 h-3 text-blue-500 ml-auto" />}
+            </button>
+            {users.map(u => {
+              const uName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email
+              const uAvatar = u.image_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(uName)}&background=e2e8f0&color=475569&size=32`
+              const isSelected = value === u.user_id
+              return (
+                <button
+                  key={u.user_id}
+                  onClick={() => { onChange(u.user_id); setOpen(false) }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-colors ${
+                    isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <img src={uAvatar} className="w-5 h-5 rounded-full border border-slate-200 object-cover flex-shrink-0" alt={uName} />
+                  <div className="text-left min-w-0">
+                    <p className="font-semibold truncate">{uName}</p>
+                    {u.specialization && <p className="text-[10px] text-slate-400 truncate">{u.specialization}</p>}
+                    {!u.specialization && u.role && <p className="text-[10px] text-slate-400 capitalize">{u.role}</p>}
+                  </div>
+                  {isSelected && <Check className="w-3 h-3 text-blue-500 flex-shrink-0 ml-auto" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Read-only assignee chip for non-managers
+function AssigneeChip({ value, users }: { value: string | null; users: any[] }) {
+  if (!value) return (
+    <span className="flex items-center gap-1 text-[11px] text-slate-400">
+      <UserCircle2 className="w-3.5 h-3.5" /> Unassigned
+    </span>
+  )
+  const u = users.find(m => m.user_id === value)
+  const name = u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email : 'Member'
+  const avatar = u?.image_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=e2e8f0&color=475569&size=32`
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 max-w-[150px]">
+      <img src={avatar} className="w-4 h-4 rounded-full border border-slate-200 object-cover flex-shrink-0" alt={name} />
+      <span className="truncate">{name}</span>
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function SprintBoardView() {
   const project = useProjectStore((s) => s.project)
   const setProject = useProjectStore((s) => s.setProject)
   const backlog = project?.backlog || null
+  const { user } = useAppUser()
 
   const [viewMode, setViewMode] = useState<'sprint' | 'kanban'>('kanban')
   const [users, setUsers] = useState<any[]>([])
-  const [workspaceRole,setWorkspaceRole]=useState('viewer')
+  const [myTasksOnly, setMyTasksOnly] = useState(false)
+  const projectRole = useProjectRole()
   
   useEffect(() => {
-    if(project?.id)getProjectMembers(project.id).then(res=>{setUsers(res.members||[]);setWorkspaceRole(res.role)}).catch(console.error)
+    if (project?.id) getProjectMembers(project.id).then(res => { setUsers(res.members || []) }).catch(console.error)
   }, [project?.id])
 
   if (!backlog) {
@@ -59,7 +168,10 @@ export function SprintBoardView() {
   const sprints = [...(backlog.sprints || [])].sort((a, b) => a.number - b.number)
 
   // Ensure tasks have statuses
-  const normalizedTasks = tasks.map((t: any,index:number) => ({ ...t, status: t.status || 'To Do',_index:index }))
+  const allNormalizedTasks = tasks.map((t: any, index: number) => ({ ...t, status: t.status || 'To Do', _index: index }))
+  const normalizedTasks = myTasksOnly
+    ? allNormalizedTasks.filter((t: any) => t.assignee_id === user?.id)
+    : allNormalizedTasks
 
   const updateTask = async (taskIndex: number, updates: Partial<any>) => {
     if (!project) return
@@ -89,12 +201,15 @@ export function SprintBoardView() {
 
   const renderTaskCard = (task: any, idx: number) => {
     const deps = task.dependencies?.length || 0
+    const isAssignedToMe = task.assignee_id === user?.id
     return (
       <div
         key={`${task.title}-${idx}`}
         draggable
         onDragStart={(e: any) => e.dataTransfer.setData('text/plain', String(task._index))}
-        className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing shadow-xs"
+        className={`p-3.5 bg-white border rounded-xl hover:shadow-sm transition-all cursor-grab active:cursor-grabbing shadow-xs ${
+          isAssignedToMe ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+        }`}
       >
         <div className="flex items-start justify-between gap-2">
           <p className="font-semibold text-xs text-slate-900 leading-snug flex-1">
@@ -121,22 +236,19 @@ export function SprintBoardView() {
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px]">
-          <div className="relative">
-            <select 
-              className="bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-600 hover:text-slate-900 cursor-pointer outline-none px-2 py-0.5 max-w-[130px] truncate"
-              value={task.assignee_id || ''}
-              onChange={(e) => updateTask(task._index, { assignee_id: e.target.value || null })}
-              disabled={!['owner','admin','editor'].includes(workspaceRole)}
-            >
-              <option value="">Unassigned</option>
-              {users.map(u => (
-                <option key={u.user_id} value={u.user_id}>{u.first_name} {u.last_name}</option>
-              ))}
-            </select>
-          </div>
+        {/* Assignee row */}
+        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 gap-2">
+          {projectRole === 'manager' ? (
+            <AssigneePicker
+              value={task.assignee_id || null}
+              users={users}
+              onChange={(id) => updateTask(task._index, { assignee_id: id })}
+            />
+          ) : (
+            <AssigneeChip value={task.assignee_id || null} users={users} />
+          )}
           {task.epic && (
-            <p className="text-[10px] text-slate-500 flex items-center gap-1 max-w-[110px] truncate" title={task.epic}>
+            <p className="text-[10px] text-slate-500 flex items-center gap-1 max-w-[100px] truncate" title={task.epic}>
               <Layers className="w-3 h-3 flex-shrink-0 text-slate-400" /> {task.epic}
             </p>
           )}
@@ -151,22 +263,37 @@ export function SprintBoardView() {
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-0.5">Sprint Board</h2>
           <p className="text-slate-500 text-sm">
-            {sprints.length} sprints · drag and drop tasks to update delivery status
+            {sprints.length} sprints · {normalizedTasks.length} tasks{myTasksOnly ? ' (my tasks)' : ''} · drag cards to update status
           </p>
         </div>
-        <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-1">
-          <button 
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-            onClick={() => setViewMode('kanban')}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* My tasks filter */}
+          <button
+            onClick={() => setMyTasksOnly(o => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+              myTasksOnly
+                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
           >
-            Kanban Board
+            <Filter className="w-3.5 h-3.5" />
+            My Tasks
           </button>
-          <button 
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'sprint' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-            onClick={() => setViewMode('sprint')}
-          >
-            Sprint Columns
-          </button>
+          {/* View toggle */}
+          <div className="flex bg-slate-100 border border-slate-200 rounded-lg p-1">
+            <button 
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setViewMode('kanban')}
+            >
+              Kanban
+            </button>
+            <button 
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${viewMode === 'sprint' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setViewMode('sprint')}
+            >
+              Sprints
+            </button>
+          </div>
         </div>
       </div>
 

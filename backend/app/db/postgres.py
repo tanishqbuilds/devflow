@@ -243,6 +243,47 @@ CREATE INDEX IF NOT EXISTS orchestration_events_job_idx
     ON orchestration_events(job_id, id);
 CREATE INDEX IF NOT EXISTS orchestration_events_project_idx
     ON orchestration_events(project_id, id DESC);
+
+-- RBAC: user specialization
+ALTER TABLE users ADD COLUMN IF NOT EXISTS specialization TEXT;
+
+-- RBAC: project-level membership and role assignment
+CREATE TABLE IF NOT EXISTS project_members (
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(clerk_user_id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('manager', 'developer', 'tester')),
+    specialization TEXT,
+    invited_by TEXT REFERENCES users(clerk_user_id),
+    invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    accepted_at TIMESTAMPTZ,
+    PRIMARY KEY (project_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_id);
+
+-- RBAC: project-level email invitations
+CREATE TABLE IF NOT EXISTS project_invites (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('manager', 'developer', 'tester')),
+    specialization TEXT,
+    invited_by TEXT NOT NULL REFERENCES users(clerk_user_id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    accepted_by TEXT REFERENCES users(clerk_user_id),
+    accepted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS project_invites_email_idx ON project_invites(email);
+CREATE INDEX IF NOT EXISTS project_invites_project_idx ON project_invites(project_id);
+
+-- Migrate existing project creators into project_members as managers
+INSERT INTO project_members (project_id, user_id, role, accepted_at)
+SELECT p.id, p.user_id, 'manager', p.created_at
+FROM projects p
+WHERE NOT EXISTS (
+    SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = p.user_id
+)
+ON CONFLICT DO NOTHING;
 """
 
 

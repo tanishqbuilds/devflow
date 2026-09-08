@@ -13,6 +13,7 @@ import {
   ListChecks,
   KanbanSquare,
   ShieldAlert,
+  ShieldCheck,
   CalendarRange,
   DollarSign,
   Users,
@@ -64,7 +65,8 @@ const groups: SidebarGroup[] = [
     items: [
       { mode: 'milestones', label: 'Timeline', icon: <CalendarRange /> },
       { mode: 'cost', label: 'Cost & Budget', icon: <DollarSign /> },
-      { mode: 'team', label: 'Team Roles', icon: <Users /> },
+      { mode: 'team', label: 'AI Organization', icon: <Users /> },
+      { mode: 'members', label: 'Team Members', icon: <ShieldCheck /> },
       { mode: 'integrations', label: 'DevOps & CI/CD', icon: <Plug /> },
     ],
   },
@@ -153,13 +155,14 @@ export function Sidebar() {
 
         <div className="mt-auto pt-2">
           <div className="my-2 border-t border-slate-200" />
-          <button
+          <Link
+            href="/settings"
             className="w-full px-3 py-2 rounded-lg flex items-center gap-2.5 text-left text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Settings"
           >
             <Settings className="w-4 h-4 flex-shrink-0 text-slate-400" />
             {!sidebarCollapsed && <span className="whitespace-nowrap">Settings</span>}
-          </button>
+          </Link>
         </div>
       </div>
     </aside>

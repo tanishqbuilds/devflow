@@ -13,13 +13,15 @@ import {
   LogOut, 
   Sparkles,
   BarChart2,
-  Lock
+  Lock,
+  AlertCircle
 } from 'lucide-react'
 
 export function AccountPanel() {
   const { accountPanelOpen, setAccountPanelOpen } = useAppStore()
   const { user, isClerk } = useAppUser()
   const { signOut, updateProfile } = useAppAuth()
+  const isBypassMode = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'
 
   // Inline edit state for mock user
   const [isEditing, setIsEditing] = useState(false)
@@ -86,13 +88,18 @@ export function AccountPanel() {
                   className="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-xs"
                 />
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-bold text-slate-900">
                       {user?.fullName || 'Demo Engineer'}
                     </h3>
                     <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
                       PRO
                     </span>
+                    {isBypassMode && (
+                      <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                        DEMO
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {user?.primaryEmailAddress?.emailAddress || 'engineer@devflow.ai'}
@@ -177,6 +184,19 @@ export function AccountPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* Demo Mode Info */}
+              {isBypassMode && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-left">
+                    <p className="text-[11px] font-semibold text-amber-900">Demo Mode</p>
+                    <p className="text-[10px] text-amber-700 mt-0.5">
+                      You're using a mock account. Real authentication requires Clerk setup.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bottom Actions */}

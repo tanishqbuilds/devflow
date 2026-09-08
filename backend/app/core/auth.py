@@ -11,7 +11,7 @@ from fastapi import Depends, HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
-from app.db.postgres import execute
+from app.db.postgres import execute, fetchrow
 
 bearer = HTTPBearer(auto_error=False)
 _jwks_client = (
@@ -27,20 +27,31 @@ class CurrentUser:
     first_name: str | None = None
     last_name: str | None = None
     image_url: str | None = None
+    role: str = "developer"
+    specialization: str | None = None
+
+
+def _get_jwks_client():
+    global _jwks_client
+    if _jwks_client is None and settings.clerk_issuer_url:
+        _jwks_client = jwt.PyJWKClient(f"{settings.clerk_issuer_url.rstrip('/')}/.well-known/jwks.json")
+    return _jwks_client
 
 
 def _decode_token(token: str) -> dict[str, Any]:
     if not settings.clerk_issuer_url:
         raise HTTPException(status_code=503, detail="Clerk is not configured")
     try:
-        if _jwks_client is None:
+        client = _get_jwks_client()
+        if client is None:
             raise HTTPException(status_code=503, detail="Clerk is not configured")
-        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        signing_key = client.get_signing_key_from_jwt(token)
+        issuer_clean = settings.clerk_issuer_url.rstrip("/")
         claims = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            issuer=settings.clerk_issuer_url,
+            issuer=issuer_clean,
             options={"require": ["exp", "iat", "sub"]},
         )
         authorized_party = claims.get("azp")
@@ -73,18 +84,19 @@ DEMO_USER = CurrentUser(
     first_name="Demo",
     last_name="User",
     image_url="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80",
+    role="manager",
 )
 
 
 async def _ensure_demo_user() -> CurrentUser:
     try:
         await execute(
-            """INSERT INTO users (clerk_user_id, email, first_name, last_name, image_url)
-               VALUES ($1, $2, $3, $4, $5)
+            """INSERT INTO users (clerk_user_id, email, first_name, last_name, image_url, role)
+               VALUES ($1, $2, $3, $4, $5, $6)
                ON CONFLICT (clerk_user_id) DO UPDATE SET
                  email=EXCLUDED.email, first_name=EXCLUDED.first_name,
                  last_name=EXCLUDED.last_name, image_url=EXCLUDED.image_url, updated_at=NOW()""",
-            DEMO_USER.id, DEMO_USER.email, DEMO_USER.first_name, DEMO_USER.last_name, DEMO_USER.image_url,
+            DEMO_USER.id, DEMO_USER.email, DEMO_USER.first_name, DEMO_USER.last_name, DEMO_USER.image_url, DEMO_USER.role,
         )
     except Exception:
         pass
@@ -103,20 +115,30 @@ async def authenticate_token(token: str) -> CurrentUser:
         emails = profile.get("email_addresses") or []
         primary_id = profile.get("primary_email_address_id")
         primary = next((item for item in emails if item.get("id") == primary_id), emails[0] if emails else {})
-        user = CurrentUser(
-            id=user_id,
-            email=primary.get("email_address") or claims.get("email"),
-            first_name=profile.get("first_name") or claims.get("first_name"),
-            last_name=profile.get("last_name") or claims.get("last_name"),
-            image_url=profile.get("image_url") or claims.get("image_url"),
-        )
+        email_addr = primary.get("email_address") or claims.get("email")
+        first = profile.get("first_name") or claims.get("first_name")
+        last = profile.get("last_name") or claims.get("last_name")
+        img = profile.get("image_url") or claims.get("image_url")
         await execute(
             """INSERT INTO users (clerk_user_id, email, first_name, last_name, image_url)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT (clerk_user_id) DO UPDATE SET
                  email=EXCLUDED.email, first_name=EXCLUDED.first_name,
                  last_name=EXCLUDED.last_name, image_url=EXCLUDED.image_url, updated_at=NOW()""",
-            user.id, user.email, user.first_name, user.last_name, user.image_url,
+            user_id, email_addr, first, last, img,
+        )
+        # Fetch role and specialization from DB
+        db_row = await fetchrow(
+            "SELECT role, specialization FROM users WHERE clerk_user_id=$1", user_id
+        )
+        user = CurrentUser(
+            id=user_id,
+            email=email_addr,
+            first_name=first,
+            last_name=last,
+            image_url=img,
+            role=db_row["role"] if db_row and db_row["role"] else "developer",
+            specialization=db_row["specialization"] if db_row else None,
         )
         return user
     except Exception:

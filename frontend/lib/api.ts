@@ -15,15 +15,18 @@ const endpoint = {
   agents: () => `${apiBase()}/agents`,
   projects: () => `${apiBase()}/projects`,
   project: (projectId: string) => `${apiBase()}/projects/${projectId}`,
-  projectAction: (projectId: string, action: string) =>
-    `${apiBase()}/projects/${projectId}/${action}`,
-  projectTask: (projectId: string, index: number) =>
-    `${apiBase()}/projects/${projectId}/tasks/${index}`,
+  projectAction: (id: string, action: string) => `${apiBase()}/projects/${id}/${action}`,
+  projectTask: (id: string, taskIdx: number) => `${apiBase()}/projects/${id}/tasks/${taskIdx}`,
+  projectInvites: (id: string) => `${apiBase()}/projects/${id}/invites`,
+  projectInviteAction: (id: string, inviteId: string) => `${apiBase()}/projects/${id}/invites/${inviteId}`,
+  projectMemberAction: (id: string, memberId: string) => `${apiBase()}/projects/${id}/members/${memberId}`,
+  myRole: () => `${apiBase()}/users/me/role`,
   users: () => `${apiBase()}/users`,
   userSync: () => `${apiBase()}/users/sync`,
   workspaces: () => `${apiBase()}/workspaces`,
   workspaceInvites: (workspaceId: string) => `${apiBase()}/workspaces/${workspaceId}/invites`,
   acceptWorkspaceInvite: (token: string) => `${apiBase()}/workspaces/invites/${token}/accept`,
+  acceptProjectInviteEndpoint: (inviteId: string) => `${apiBase()}/invites/${inviteId}/accept`,
 }
 
 let tokenProvider: (() => Promise<string | null>) | null = null
@@ -189,5 +192,16 @@ export async function updateBacklog(projectId: string, backlog: any): Promise<{ 
   })
   return jsonOrThrow(res)
 }
-export async function getProjectMembers(projectId:string):Promise<{members:any[];role:'owner'|'admin'|'editor'|'viewer'}>{const res=await fetch(endpoint.projectAction(projectId, 'members'),{headers:await authHeaders()});return jsonOrThrow(res)}
+
+export async function getProjectMembers(projectId:string):Promise<{members:any[];role:'manager'|'developer'|'tester'|null}>{const res=await fetch(endpoint.projectAction(projectId, 'members'),{headers:await authHeaders()});return jsonOrThrow(res)}
+
 export async function updateProjectTask(projectId:string,index:number,payload:{assignee_id?:string|null;status?:string;expected_revision?:number}){const res=await fetch(endpoint.projectTask(projectId, index),{method:'PATCH',headers:await authHeaders(true),body:JSON.stringify(payload)});return jsonOrThrow(res)}
+
+export async function getProjectInvites(projectId:string):Promise<{invites:any[]}>{const res=await fetch(endpoint.projectInvites(projectId),{headers:await authHeaders()});return jsonOrThrow(res)}
+export async function inviteProjectMember(projectId:string,email:string,role:string,specialization?:string){const res=await fetch(endpoint.projectAction(projectId,'members'),{method:'POST',headers:await authHeaders(true),body:JSON.stringify({email,role,specialization})});return jsonOrThrow(res)}
+export async function updateProjectMemberRole(projectId:string,memberId:string,role:string,specialization?:string){const res=await fetch(endpoint.projectMemberAction(projectId,memberId),{method:'PUT',headers:await authHeaders(true),body:JSON.stringify({role,specialization})});return jsonOrThrow(res)}
+export async function removeProjectMember(projectId:string,memberId:string){const res=await fetch(endpoint.projectMemberAction(projectId,memberId),{method:'DELETE',headers:await authHeaders()});return jsonOrThrow(res)}
+export async function revokeProjectInvite(projectId:string,inviteId:string){const res=await fetch(endpoint.projectInviteAction(projectId,inviteId),{method:'DELETE',headers:await authHeaders()});return jsonOrThrow(res)}
+export async function updateMyRole(role:string,specialization?:string){const res=await fetch(endpoint.myRole(),{method:'PUT',headers:await authHeaders(true),body:JSON.stringify({role,specialization})});return jsonOrThrow(res)}
+export async function updateMySpecialization(specialization:string){const res=await fetch(endpoint.myRole(),{method:'PUT',headers:await authHeaders(true),body:JSON.stringify({role:'developer',specialization})});return jsonOrThrow(res)}
+export async function acceptProjectInvite(inviteId:string):Promise<{status:string}>{const res=await fetch(endpoint.acceptProjectInviteEndpoint(inviteId),{method:'POST',headers:await authHeaders(true)});return jsonOrThrow(res)}

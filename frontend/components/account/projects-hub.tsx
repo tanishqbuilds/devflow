@@ -22,9 +22,10 @@ import {
 import { listProjects } from '@/lib/api'
 import type { ProjectDoc } from '@/lib/project-types'
 import { TopNavbar } from '@/components/layout/top-navbar'
+import { AccountPanel } from '@/components/layout/account-panel'
 import { useAppUser } from '@/lib/auth-context'
 
-type ProjectSummary = Partial<ProjectDoc>
+type ProjectSummary = Partial<ProjectDoc> & { project_role?: string, project_specialization?: string }
 
 const TEMPLATE_IDEAS = [
   'AI-powered recruitment portal for tech startups',
@@ -47,6 +48,7 @@ export function ProjectsHub() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
       <TopNavbar />
+      <AccountPanel />
 
       <main className="flex-1 relative z-10 pt-24 pb-16 px-4 sm:px-6 max-w-7xl mx-auto w-full space-y-8">
         {/* Welcome & Quick Action Header */}
@@ -64,11 +66,19 @@ export function ProjectsHub() {
               My Projects
             </h1>
             <p className="text-slate-500 text-xs sm:text-sm mt-1">
-              Select a project to view its architecture, backlog, timeline, and team, or plan a new delivery specification.
+              Create a new project or select an existing project to view architecture, backlog, and team collaboration.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* My Tasks quick link */}
+            <Link href="/my-tasks">
+              <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 font-semibold text-xs transition-colors shadow-xs cursor-pointer">
+                <Zap className="w-4 h-4 text-indigo-500" />
+                My Tasks
+              </button>
+            </Link>
+            {/* Anyone can create a project and becomes its manager */}
             <Link href="/projects/new">
               <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer">
                 <Plus className="w-4 h-4" />
@@ -116,13 +126,14 @@ export function ProjectsHub() {
         </div>
 
         {/* Projects List & Filters */}
-        <ProjectsSection />
+        <ProjectsSection userId={user?.id ?? null} />
       </main>
     </div>
   )
 }
 
-function ProjectsSection() {
+
+function ProjectsSection({ userId }: { userId: string | null }) {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -131,6 +142,14 @@ function ProjectsSection() {
   const router = useRouter()
 
   useEffect(() => {
+    // Reset state immediately when user changes so stale data is never shown
+    setProjects([])
+    setLoading(true)
+    setError(null)
+
+    // Don't fetch until we know who the user is
+    if (!userId) return
+
     let mounted = true
     listProjects()
       .then((res) => {
@@ -146,7 +165,7 @@ function ProjectsSection() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [userId])
 
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
@@ -190,7 +209,9 @@ function ProjectsSection() {
         <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto mb-4">
           <LayoutDashboard className="w-6 h-6" />
         </div>
-        <h3 className="text-lg font-bold text-slate-900">No projects yet</h3>
+        <h3 className="text-lg font-bold text-slate-900">
+          No projects yet
+        </h3>
         <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-md mx-auto mb-6">
           Start your first autonomous AI orchestration. Plan requirements, backlog, system architecture, team, cost, and timelines.
         </p>
@@ -248,11 +269,28 @@ function ProjectsSection() {
               onClick={() => router.push(`/workspace?project=${p.id}`)}
               className="group flex flex-col p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-blue-400 hover:shadow-md cursor-pointer transition-all duration-200"
             >
-              <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-start justify-between gap-3 mb-2">
                 <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
                   {p.title || 'Untitled Project'}
                 </h3>
                 <StatusBadge status={p.status} />
+              </div>
+              
+              <div className="flex items-center gap-2 mb-3">
+                {p.project_role && (
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    p.project_role === 'manager' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    p.project_role === 'developer' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    {p.project_role}
+                  </span>
+                )}
+                {p.project_specialization && (
+                  <span className="text-[10px] font-medium text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full">
+                    {p.project_specialization}
+                  </span>
+                )}
               </div>
 
               <p className="text-slate-500 text-xs line-clamp-2 mb-4 leading-relaxed flex-1">

@@ -23,6 +23,8 @@ async def sync_user(req: SyncUserRequest, current: CurrentUser=Depends(current_u
         user = await user_service.upsert_user(
             current.id, req.email, req.first_name, req.last_name, req.image_url
         )
+        from app.services.rbac import accept_pending_invites
+        await accept_pending_invites(current.id, req.email)
         return user
     except Exception as exc:
         logger.error("Failed to sync user: %s", exc)
