@@ -156,6 +156,40 @@ class RequirementsBundle(BaseModel):
 # --------------------------------------------------------------------------- #
 # System Architect Agent — Architecture (kept mostly the same)
 # --------------------------------------------------------------------------- #
+def _normalize_key_entity(value: Any) -> str:
+    """Coerce architecture key-entity objects into the string form the schema expects.
+
+    The LLM can sometimes emit route-like dictionaries such as
+    {"method": "POST", "path": "/login", "description": "Authenticate user"}
+    instead of plain labels like "POST /login - Authenticate user".
+    This helper turns that payload into the plain-text string the validator wants.
+    """
+    if isinstance(value, str):
+        return value.strip()
+
+    if isinstance(value, dict):
+        method = str(value.get("method") or "").strip().upper()
+        path = str(value.get("path") or value.get("route") or value.get("endpoint") or value.get("name") or "").strip()
+        description = str(value.get("description") or value.get("summary") or value.get("detail") or "").strip()
+
+        if method and path:
+            entity = f"{method} {path}"
+            if description:
+                entity = f"{entity} - {description}"
+            return entity
+
+        if path:
+            entity = path
+            if description:
+                entity = f"{entity} - {description}"
+            return entity
+
+        # Last-resort serializer for arbitrary dicts
+        return " - ".join(f"{k}: {v}" for k, v in value.items() if v is not None)
+
+    return str(value).strip()
+
+
 class ArchitectureLayer(BaseModel):
     summary: str = Field(default="")
     components: List[str] = Field(default_factory=list)
@@ -170,10 +204,22 @@ class ArchitectureLayer(BaseModel):
     @classmethod
     def normalize_layer(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            for key in ["components", "technologies", "decisions", "key_entities"]:
+            for key in ["components", "technologies", "decisions"]:
                 val = data.get(key)
                 if isinstance(val, str):
                     data[key] = [x.strip() for x in val.split(",") if x.strip()]
+
+            # key_entities is the only field that may arrive as a list of dicts,
+            # each dict representing an endpoint / route / entity description.
+            key_entities = data.get("key_entities")
+            if isinstance(key_entities, str):
+                data["key_entities"] = [x.strip() for x in key_entities.split(",") if x.strip()]
+            elif isinstance(key_entities, list):
+                data["key_entities"] = [
+                    _normalize_key_entity(item)
+                    for item in key_entities
+                    if str(item).strip()
+                ]
         return data
 
 
